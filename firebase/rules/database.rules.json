@@ -1,0 +1,23 @@
+{
+  "rules": {
+    "rooms": {
+      "$roomId": {
+        ".read": "auth != null && data.child('players').hasChild(auth.uid)",
+        ".write": "auth != null && data.child('players').hasChild(auth.uid)",
+        "teacherControl": {
+          ".read": "auth != null && root.child('teachers').child(auth.uid).exists()"
+        }
+      }
+    },
+    "mappings": {
+      ".read": "false",
+      ".write": "false"
+    },
+    "teachers": {
+      "$teacherId": {
+        ".read": "auth != null && auth.uid === $teacherId",
+        ".write": "auth != null && auth.uid === $teacherId"
+      }
+    }
+  }
+}
