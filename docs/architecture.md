@@ -81,6 +81,7 @@ Poznámky ke schématu:
 
 Hlavní pravidla:
 - Mapovací tabulka (`/mappings`) nesmí být čitelná běžným hráčům (`.read: false`).
+- Matchmaking se provádí přes volatelnou Cloud Function `lookupMappingByEmail`; klient nikdy nečte uzel `/mappings` přímo.
 - Klient smí číst pouze uzel `/rooms/{roomId}` když je uživatel součástí této místnosti.
 - Odemknutí reflexe (přístup ke skutečným identitám) se řídí hodnotou `teacherControl/reflectionUnlocked` a čtení identity je povoleno až po jejím nastavení učitelem.
 
@@ -98,6 +99,20 @@ Příklad výňatku pravidel (koncept):
 ```
 
 Poznámka: výše je koncept – bezpečnostní pravidla nutno upravit podle přesného modelu autentizace a teacher-rolí.
+
+## G. Google Workspace přihlášení a server-side matchmaking
+
+Matchmaking je implementován jako bezpečná volatelná Cloud Function.
+- Volatelná funkce: `lookupMappingByEmail`
+- Nasazeno na: `https://us-central1-uhk-game.cloudfunctions.net/lookupMappingByEmail`
+- Klient se přihlásí přes Google Workspace účet (Firebase Auth), získá autorizovaný token a pošle své e-mailové jméno do funkce.
+- Funkce načte `mappings/{encodedEmail}` z Realtime Database a vrátí cílovou `room`.
+- E-mailové klíče v DB jsou enkódovány tak, že `.` jsou nahrazeny čárkami `,`.
+
+Tento přístup zajistí, že:
+- Klient nečte přímo citlivou mapovací tabulku `/mappings`.
+- Uživatelé i administrátor používají svůj Google Workspace účet.
+- Mapovací tabulka může obsahovat páry `email -> room` pro přesné předdefinované spárování.
 
 ## D. Administrátorské rozhraní (Master Control)
 

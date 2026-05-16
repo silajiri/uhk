@@ -3,3 +3,4 @@
 *.secret
 *.key
 firebase-debug.log
+firebase.settings

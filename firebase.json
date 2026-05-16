@@ -1,0 +1,14 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".runtimeconfig.json",
+        "firestore.indexes.json",
+        "firestore.rules"
+      ]
+    }
+  ]
+}

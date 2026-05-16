@@ -1,0 +1,12 @@
+{
+  "name": "uhk-functions",
+  "private": true,
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "firebase-admin": "^11.0.0",
+    "firebase-functions": "^4.0.0"
+  }
+}

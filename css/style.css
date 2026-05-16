@@ -1,0 +1,153 @@
+:root {
+  --bg: #f7f1ff;
+  --card: #ffffff;
+  --primary: #6752ff;
+  --primary-soft: #8373ff;
+  --accent: #ff6f79;
+  --text: #2b2140;
+  --muted: #6c5f7d;
+  --border: rgba(103, 82, 255, 0.12);
+  --shadow: 0 30px 90px rgba(103, 82, 255, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: 'Fredoka', 'Segoe UI', sans-serif;
+  background: radial-gradient(circle at top, rgba(103, 82, 255, 0.08), transparent 35%),
+    linear-gradient(180deg, #f7f1ff 0%, #fffafa 100%);
+  color: var(--text);
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.login-page {
+  width: 100%;
+  max-width: 480px;
+}
+
+.login-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 32px;
+  box-shadow: var(--shadow);
+  padding: 2.5rem 2rem;
+  text-align: center;
+}
+
+.hero-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+h1 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  line-height: 1.05;
+}
+
+.description {
+  margin: 0 0 2rem;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.login-button {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  background: linear-gradient(135deg, var(--primary), var(--primary-soft));
+  color: #ffffff;
+  border: none;
+  border-radius: 18px;
+  padding: 1rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+  box-shadow: 0 16px 30px rgba(103, 82, 255, 0.18);
+}
+
+.login-button:hover {
+  transform: translateY(-2px);
+}
+
+.login-button:disabled {
+  opacity: 0.75;
+  cursor: wait;
+  transform: none;
+}
+
+.button-icon {
+  font-size: 1.1rem;
+}
+
+.spinner-row {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: var(--muted);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.spinner {
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 3px solid rgba(103, 82, 255, 0.25);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.status-message {
+  min-height: 2rem;
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.status-error {
+  color: #d62828;
+}
+
+.status-info {
+  color: var(--muted);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 420px) {
+  .login-card {
+    padding: 2rem 1.25rem;
+  }
+
+  .description {
+    font-size: 0.98rem;
+  }
+
+  .login-button {
+    padding: 0.95rem 1rem;
+  }
+}

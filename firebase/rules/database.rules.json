@@ -10,8 +10,12 @@
       }
     },
     "mappings": {
-      ".read": "false",
-      ".write": "false"
+      ".read": false,
+      ".write": false
+    },
+    "questions": {
+      ".read": "auth != null",
+      ".write": false
     },
     "teachers": {
       "$teacherId": {

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UHK Hra - Herní plocha</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div style="text-align: center; margin-top: 50px;">
+        <h1>?? Vítej ve hre!</h1>
+        <p>Tvoje prirazené zvírátko je: <strong id="player-animal">Nacítám...</strong></p>
+    </div>
+
+    <script>
+        // Jednoduchá kontrola, kterou jste zminoval:
+        const animal = localStorage.getItem('animal'); // nebo jak to auth.js uložil
+        if (!animal) {
+            // Pokud žák není prihlášen, vyhodíme ho zpet na login
+            window.location.href = 'index.html';
+        } else {
+            document.getElementById('player-animal').innerText = animal;
+        }
+    </script>
+</body>
+</html>

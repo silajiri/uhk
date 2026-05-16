@@ -1,0 +1,23 @@
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCq_5Ftr7L9c2zz7mFzVp4v-KfNdGuHyF8",
+  authDomain: "uhk-game.firebaseapp.com",
+  projectId: "uhk-game",
+  storageBucket: "uhk-game.firebasestorage.app",
+  messagingSenderId: "1049280155064",
+  appId: "1:1049280155064:web:d7c1862e73aebbcfed534d",
+  measurementId: "G-HXFMYDSK7F"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+// https://uhk-game-default-rtdb.europe-west1.firebasedatabase.app/

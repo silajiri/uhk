@@ -18,6 +18,8 @@ Tento soubor obsahuje věci, které nejsou přímo v kódu, ale musí být dodr�
 ## 4. Ochrana identity a přístup k údajům
 - Mapovací tabulka (Skutečné jméno <-> Zvíře) nesmí být stáhnuta na klienta.
 - Identita parťáka se odhaluje pouze po aktivaci reflexní fáze učitelem (`teacherControl/reflectionUnlocked`).
+- Matchmaking používá Google Workspace přihlášení a server-side Cloud Function `lookupMappingByEmail`.
+- Klient nesmí číst `/mappings` přímo; místo toho se spouští volání na `https://us-central1-uhk-game.cloudfunctions.net/lookupMappingByEmail`.
 
 ## 5. Admin workflow (krátké instrukce)
 - Před spuštěním lekce: učitel nahraje mapovací a párovací tabulku do adminu.

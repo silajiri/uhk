@@ -9,7 +9,7 @@ Krátké představení a cíle projektu — technické detaily najdete v `docs/a
 
 ## 2. Fáze vývoje (Milníky pro AI asistenta)
 *   **Krok 1: UI základ & Datový model** (Příprava HTML pro přihlášení a návrh JSON struktury pro Firebase mapovací tabulku a chování).
-*   **Krok 2: Cílený Matchmaking** (Napojení na Firebase – přečtení přezdívky, automatické spárování do anonymních dvojic a přesměrování do správné `room`).
+*   **Krok 2: Cílený Matchmaking** (Přihlášení přes Google Workspace účet, server-side lookup e-mailu v bezpečné Firebase Cloud Function a přesměrování do předdefinované místnosti). Uživatelé i administrátor používají svůj Google účet.
 *   **Krok 3: Herní mechaniky & Logování** (Vytvoření herního rozhraní pro moduly Tajemství, Zastání se, Výsměch vs. Podpora a ukládání dat do databáze).
 *   **Krok 4: Modul "Post-Game Reflection"** (Interaktivní rekapitulace, odkrytí identity, zrcadlení vlastních rozhodnutí a zobrazení anonymních vzkazů).
 

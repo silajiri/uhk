@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UHK Hra – Administrace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f7f1ff;
+      --card: #ffffff;
+      --primary: #6752ff;
+      --primary-soft: #8373ff;
+      --accent: #ff6f79;
+      --text: #2b2140;
+      --muted: #6c5f7d;
+      --border: rgba(103, 82, 255, 0.12);
+      --shadow: 0 30px 90px rgba(103, 82, 255, 0.14);
+      --success: #2ecc71;
+      --error: #e74c3c;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Fredoka', 'Segoe UI', sans-serif;
+      background: linear-gradient(180deg, #f7f1ff 0%, #fffafa 100%);
+      color: var(--text);
+    }
+
+    body {
+      min-height: 100vh;
+      padding: 2rem 1.5rem;
+    }
+
+    .admin-container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .admin-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .admin-header h1 {
+      margin: 0;
+      font-size: 2rem;
+    }
+
+    .logout-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 0.75rem 1.25rem;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 150ms ease, opacity 150ms ease;
+    }
+
+    .logout-btn:hover {
+      transform: translateY(-2px);
+      opacity: 0.9;
+    }
+
+    .section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow);
+    }
+
+    .section h2 {
+      margin-top: 0;
+      margin-bottom: 1.5rem;
+      font-size: 1.35rem;
+      color: var(--primary);
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    textarea,
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      resize: vertical;
+      transition: border-color 150ms ease;
+    }
+
+    textarea:focus,
+    input[type="text"]:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(103, 82, 255, 0.1);
+    }
+
+    textarea {
+      min-height: 120px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+    }
+
+    .input-hint {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 0.3rem;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      flex: 1;
+      padding: 0.9rem 1.25rem;
+      border: none;
+      border-radius: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 150ms ease, opacity 150ms ease;
+      font-size: 0.95rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-soft));
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: #e0d5ff;
+      color: var(--primary);
+    }
+
+    .btn-secondary:hover {
+      opacity: 0.85;
+    }
+
+    .message {
+      padding: 1rem;
+      border-radius: 12px;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    .message.show {
+      display: block;
+    }
+
+    .message.success {
+      background: rgba(46, 204, 113, 0.1);
+      color: var(--success);
+      border-left: 4px solid var(--success);
+    }
+
+    .message.error {
+      background: rgba(231, 76, 60, 0.1);
+      color: var(--error);
+      border-left: 4px solid var(--error);
+    }
+
+    .questions-list {
+      border-top: 1px solid var(--border);
+      padding-top: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .question-item {
+      background: rgba(103, 82, 255, 0.05);
+      padding: 1rem;
+      border-radius: 10px;
+      margin-bottom: 1rem;
+    }
+
+    .question-item p {
+      margin: 0.25rem 0;
+      font-size: 0.9rem;
+    }
+
+    .question-item strong {
+      color: var(--primary);
+    }
+
+    .spinner {
+      width: 1rem;
+      height: 1rem;
+      border: 3px solid rgba(103, 82, 255, 0.25);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+      margin-right: 0.5rem;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .admin-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+      }
+
+      .logout-btn {
+        width: 100%;
+      }
+
+      .button-row {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-container">
+    <header class="admin-header">
+      <h1>🎮 UHK Hra – Administrace</h1>
+      <button class="logout-btn" id="logoutBtn">Odhlásit se</button>
+    </header>
+
+    <!-- Správa žáků -->
+    <section class="section">
+      <h2>📚 Správa žáků</h2>
+      <div id="studentsMessage" class="message"></div>
+
+      <div class="form-group">
+        <label for="studentsList">Seznam žáků (email;zvíře):</label>
+        <textarea
+          id="studentsList"
+          placeholder="student1@uhk.cz;slon&#10;student2@uhk.cz;lev&#10;student3@uhk.cz;tygr"
+        ></textarea>
+        <div class="input-hint">Formát: email;zvíře na každém řádku (odděleno enter)</div>
+      </div>
+
+      <div class="button-row">
+        <button class="btn-primary" id="saveStudentsBtn">
+          <span>✓ Uložit seznam žáků</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Správa otázek -->
+    <section class="section">
+      <h2>❓ Správa otázek</h2>
+      <div id="questionsMessage" class="message"></div>
+
+      <div class="form-group">
+        <label for="questionText">Text otázky:</label>
+        <input type="text" id="questionText" placeholder="Kterou lze důvěřovat?" />
+      </div>
+
+      <div class="form-group">
+        <label for="optionA">Možnost A:</label>
+        <input type="text" id="optionA" placeholder="Popis možnosti A" />
+      </div>
+
+      <div class="form-group">
+        <label for="optionB">Možnost B:</label>
+        <input type="text" id="optionB" placeholder="Popis možnosti B" />
+      </div>
+
+      <div class="form-group">
+        <label for="optionC">Možnost C:</label>
+        <input type="text" id="optionC" placeholder="Popis možnosti C" />
+      </div>
+
+      <div class="form-group">
+        <label for="correctOption">Správná odpověď:</label>
+        <select id="correctOption">
+          <option value="">-- Vyberte --</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+        </select>
+      </div>
+
+      <div class="button-row">
+        <button class="btn-primary" id="addQuestionBtn">
+          <span>+ Přidat otázku</span>
+        </button>
+        <button class="btn-secondary" id="clearQuestionsBtn">
+          <span>Smazat vše</span>
+        </button>
+      </div>
+
+      <div id="questionsList" class="questions-list" style="display: none;"></div>
+    </section>
+  </div>
+
+  <script type="module">
+    import { initializeAdmin } from './src/admin.js';
+    initializeAdmin();
+  </script>
+</body>
+</html>
