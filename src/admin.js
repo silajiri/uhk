@@ -81,11 +81,52 @@ async function saveStudents() {
     }
 
     showMessage('studentsMessage', result.message, 'success');
-    document.getElementById('studentsList').value = '';
+    await loadStudents();
   } catch (err) {
     showMessage('studentsMessage', err.message, 'error');
   } finally {
     setButtonLoading('saveStudentsBtn', false);
+  }
+}
+
+async function loadStudents() {
+  try {
+    const user = await new Promise((resolve) => {
+      if (auth.currentUser) {
+        return resolve(auth.currentUser);
+      }
+      const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+        unsubscribe();
+        resolve(currentUser);
+      });
+    });
+
+    if (!user) {
+      throw new Error('Uživatel není přihlášen');
+    }
+
+    const idToken = await user.getIdToken();
+    const response = await fetch(`${SAVE_DATA_URL}?type=students`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${idToken}`
+      }
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || 'Chyba při načítání studentů');
+    }
+
+    if (Array.isArray(result.data) && result.data.length > 0) {
+      const lines = result.data.map((student) => `${student.email};${student.animal}`);
+      document.getElementById('studentsList').value = lines.join('\n');
+    } else {
+      document.getElementById('studentsList').value = '';
+    }
+  } catch (err) {
+    console.warn('loadStudents error', err);
+    showMessage('studentsMessage', err.message, 'error');
   }
 }
 
@@ -218,4 +259,5 @@ export function initializeAdmin() {
   document.getElementById('addQuestionBtn').addEventListener('click', addQuestion);
   document.getElementById('clearQuestionsBtn').addEventListener('click', clearQuestions);
   document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+  loadStudents();
 }

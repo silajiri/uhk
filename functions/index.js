@@ -23,7 +23,7 @@ const ADMIN_EMAILS = [
 
 function setCorsHeaders(res) {
   res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
@@ -100,6 +100,52 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
 
   if (req.method === 'OPTIONS') {
     return res.status(204).send('');
+  }
+
+  if (req.method === 'GET') {
+    if (!isAllowedOrigin(req)) {
+      const origin = req.get('origin') || req.get('referer') || 'unknown';
+      console.warn(`Unauthorized origin attempted GET: ${origin}`);
+      return res.status(403).json({ status: 'error', message: 'Přístup z tohoto místa není povolen' });
+    }
+
+    const authHeader = req.get('Authorization') || req.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ status: 'error', message: 'Chybí autorizační token' });
+    }
+
+    const idToken = authHeader.split('Bearer ')[1].trim();
+    if (!idToken) {
+      return res.status(401).json({ status: 'error', message: 'Neplatný autorizační token' });
+    }
+
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      const email = decodedToken.email;
+      if (!email) {
+        return res.status(401).json({ status: 'error', message: 'Nelze získat e-mail z tokenu' });
+      }
+
+      if (!isAdmin(email)) {
+        return res.status(403).json({ status: 'error', message: 'Přístup odepřen. Pouze správci.' });
+      }
+
+      const type = req.query.type || 'students';
+      if (type === 'students') {
+        const snap = await db.ref('/mappings').once('value');
+        const mappings = snap.val() || {};
+        const students = Object.entries(mappings).map(([key, value]) => ({
+          email: key.replace(/,/g, '.'),
+          animal: value.animal || ''
+        }));
+        return res.status(200).json({ status: 'success', data: students });
+      }
+
+      return res.status(400).json({ status: 'error', message: 'Neznámý typ operace' });
+    } catch (err) {
+      console.error('saveGameData GET error', err);
+      return res.status(500).json({ status: 'error', message: 'Chyba serveru při načítání dat' });
+    }
   }
 
   if (req.method !== 'POST') {
