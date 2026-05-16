@@ -1,35 +1,43 @@
-const TILE_COUNT = 20;
-const TILE_LABELS = Array.from({ length: TILE_COUNT }, (_, index) => {
-  if (index === 0) return 'START';
-  if (index === TILE_COUNT - 1) return 'CÍL';
-  return `${index + 1}`;
-});
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js';
+import { getDatabase, ref, get, set, update, onValue, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js';
+import { getAuth, signOut } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js';
 
-const QUESTIONS = [
-  {
-    text: 'Které zvíře je největší na souši?',
-    options: { A: 'Slon', B: 'Lev', C: 'Žirafa' },
-    correct: 'A'
+const STORAGE_KEY_USER = 'uhkUser';
+
+const MODULES = {
+  secret: {
+    id: 'secret',
+    tag: 'Modul 1',
+    title: 'Sdílení klíče',
+    description: 'Získal jsi tajný kód pro postup. Můžeš si ho nechat pro vlastní výhodu, nebo ho poslat svému anonymnímu parťákovi.',
+    reflection: 'Věříš mu, že tě nepodrazí?'
   },
-  {
-    text: 'Které zvíře žije ve stádu?',
-    options: { A: 'Tygr', B: 'Slon', C: 'Krokodýl' },
-    correct: 'B'
-  },
-  {
-    text: 'Které zvíře může létat?',
-    options: { A: 'Kůň', B: 'Pták', C: 'Opice' },
-    correct: 'B'
+  help: { // Placeholder for the next module
+    id: 'help',
+    tag: 'Modul 2',
+    title: 'Obranný štít',
+    description: 'Tvůj parťák je v nesnázích. Pomůžeš mu, i když tě to něco stojí?',
+    reflection: 'Zastane se mě parťák, i když ho to něco stojí?'
   }
-];
+};
 
-let playerPosition = 1;
-let animal = '';
-let userEmail = '';
-let isMoving = false;
+const firebaseConfig = {
+  apiKey: 'AIzaSyCq_5Ftr7L9c2zz7mFzVp4v-KfNdGuHyF8',
+  authDomain: 'uhk-game.firebaseapp.com',
+  projectId: 'uhk-game',
+  databaseURL: 'https://uhk-game-default-rtdb.europe-west1.firebasedatabase.app/',
+  storageBucket: 'uhk-game.firebasestorage.app',
+  messagingSenderId: '1049280155064',
+  appId: '1:1049280155064:web:d7c1862e73aebbcfed534d',
+  measurementId: 'G-HXFMYDSK7F'
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
 
 function getStoredUser() {
-  const stored = localStorage.getItem('uhkUser');
+  const stored = localStorage.getItem(STORAGE_KEY_USER) || sessionStorage.getItem(STORAGE_KEY_USER);
   if (!stored) return null;
 
   try {
@@ -39,185 +47,278 @@ function getStoredUser() {
   }
 }
 
-function redirectToLogin() {
-  window.location.href = 'index.html';
-}
-
-function updateNavbar() {
-  const emailEl = document.getElementById('playerEmail');
+function updateNavbar(animalName) {
   const badgeEl = document.getElementById('playerBadge');
-  emailEl.textContent = `Uživatel: ${userEmail || 'Anonym'}`;
-  badgeEl.textContent = animalToEmoji(animal);
+  const nameEl = document.getElementById('playerAnimalName');
+
+  badgeEl.textContent = mapAnimalToEmoji(animalName);
+  nameEl.textContent = animalName || 'Anonym';
 }
 
-function animalToEmoji(animalName) {
+function mapAnimalToEmoji(animalName) {
   const normalized = (animalName || '').trim().toLowerCase();
   const map = {
     slon: '🐘',
     lev: '🦁',
     tygr: '🐯',
-    zviratko: '🐾',
     zebra: '🦓',
-    opice: '🐒'
+    opice: '🐒',
+    papousek: '🦜',
+    delfin: '🐬'
   };
   return map[normalized] || '🐾';
 }
 
-function createBoard() {
-  const board = document.getElementById('gameBoard');
-  board.innerHTML = '';
+function renderModule(moduleId) {
+  const module = MODULES[moduleId];
+  if (!module) return;
 
-  TILE_LABELS.forEach((label, idx) => {
-    const tile = document.createElement('div');
-    tile.className = `tile tile-${idx + 1}`;
-    tile.dataset.index = String(idx + 1);
-
-    const labelEl = document.createElement('div');
-    labelEl.className = 'tile-label';
-    labelEl.textContent = label;
-    tile.appendChild(labelEl);
-
-    if (idx === 0) {
-      const token = createPlayerToken();
-      tile.appendChild(token);
-    }
-
-    board.appendChild(tile);
-  });
+  document.getElementById('moduleTitle').textContent = module.title;
+  document.getElementById('moduleDescription').textContent = module.description;
+  document.getElementById('moduleReflection').textContent = module.reflection;
 }
 
-function createPlayerToken() {
-  const token = document.createElement('div');
-  token.className = 'player-token';
-  token.textContent = animalToEmoji(animal);
-  return token;
+function showWaitingMessage(message = 'Čekám na parťáka...', title = 'Pracuji...') {
+  document.getElementById('shareButton').classList.add('hidden');
+  document.getElementById('keepButton').classList.add('hidden');
+  document.getElementById('waitingPanel').classList.remove('hidden');
+  
+  document.getElementById('waitingText').textContent = message;
+  document.querySelector('#waitingPanel .waiting-title').textContent = title;
 }
 
-function moveToken(steps) {
-  if (isMoving) return;
-  isMoving = true;
-  const target = Math.min(playerPosition + steps, TILE_COUNT);
-  const increment = playerPosition < target ? 1 : -1;
-  let current = playerPosition;
+function showModule() {
+  document.getElementById('shareButton').classList.remove('hidden');
+  document.getElementById('keepButton').classList.remove('hidden');
+  document.getElementById('waitingPanel').classList.add('hidden');
+}
 
-  const stepDelay = 250;
-  const moveStep = () => {
-    const currentTile = document.querySelector(`.tile[data-index='${current}']`);
-    const token = currentTile.querySelector('.player-token');
-    if (token) currentTile.removeChild(token);
+function setDecisionButtonsDisabled(isDisabled) {
+  document.getElementById('shareButton').disabled = isDisabled;
+  document.getElementById('keepButton').disabled = isDisabled;
+}
 
-    current += increment;
-    const nextTile = document.querySelector(`.tile[data-index='${current}']`);
-    nextTile.appendChild(createPlayerToken());
+function getPlayerRole(room, uid) {
+  if (!room || !room.players) return null;
+  if (room.players.animal1?.uid === uid) return 'animal1';
+  if (room.players.animal2?.uid === uid) return 'animal2';
+  return null;
+}
 
-    if (current < target) {
-      setTimeout(moveStep, stepDelay);
-    } else {
-      playerPosition = current;
-      isMoving = false;
-      if (playerPosition < TILE_COUNT) {
-        showQuestionModal();
+async function joinRoom(pairId, user) {
+  const roomRef = ref(db, `rooms/${pairId}`);
+  const snapshot = await get(roomRef);
+  const room = snapshot.exists() ? snapshot.val() : null;
+
+  if (!room) {
+    await set(roomRef, {
+      pairId,
+      status: 'waiting',
+      phase: 'action',
+      currentModule: 'secret',
+      createdAt: serverTimestamp(),
+      players: {
+        animal1: {
+          uid: user.uid,
+          email: user.email,
+          animal: user.animal,
+          lastSeen: Date.now(),
+          status: 'waiting',
+          joinedAt: serverTimestamp()
+        }
       }
-    }
-  };
-
-  setTimeout(moveStep, stepDelay);
-}
-
-function setDiceValue(value) {
-  const dice = document.getElementById('diceDisplay');
-  dice.textContent = value;
-  dice.classList.add('dice-animated');
-  setTimeout(() => dice.classList.remove('dice-animated'), 400);
-}
-
-function rollDice() {
-  if (isMoving) return;
-  const value = Math.floor(Math.random() * 6) + 1;
-  setDiceValue(value);
-  moveToken(value);
-}
-
-function getRandomQuestion() {
-  return QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
-}
-
-function showQuestionModal() {
-  const modal = document.getElementById('questionModal');
-  const questionText = document.getElementById('questionText');
-  const question = getRandomQuestion();
-  modal.dataset.correct = question.correct;
-  questionText.textContent = question.text;
-
-  document.querySelectorAll('.answer-button').forEach((button) => {
-    const answer = button.dataset.answer;
-    button.textContent = `${answer}: ${question.options[answer]}`;
-  });
-
-  modal.classList.remove('hidden');
-}
-
-function hideQuestionModal() {
-  document.getElementById('questionModal').classList.add('hidden');
-}
-
-function handleAnswer(event) {
-  const button = event.target.closest('.answer-button');
-  if (!button) return;
-
-  const selected = button.dataset.answer;
-  const modal = document.getElementById('questionModal');
-  const correct = modal.dataset.correct;
-
-  hideQuestionModal();
-
-  if (selected === correct) {
-    alert('Správně! Zůstáváš na místě a jsi připraven pokračovat.');
-  } else {
-    alert('Nesprávně. Vracíš se o jedno políčko zpět.');
-    const previous = Math.max(playerPosition - 1, 1);
-    moveTokenBackward(previous);
+    });
+    return { roomRef, roomStatus: 'waiting', playerRole: 'animal1' };
   }
+
+  const players = room.players || {};
+  const isPlayer1 = players.animal1?.uid === user.uid;
+  const isPlayer2 = players.animal2?.uid === user.uid;
+
+  if (isPlayer1) {
+    return { roomRef, roomStatus: room.status || 'waiting', playerRole: 'animal1' };
+  }
+
+  if (isPlayer2) {
+    return { roomRef, roomStatus: room.status || 'waiting', playerRole: 'animal2' };
+  }
+
+  if (room.status === 'waiting' && !players.animal2) {
+    await update(roomRef, {
+      status: 'playing',
+      startedAt: serverTimestamp(),
+      players: {
+        ...players,
+        animal2: {
+          uid: user.uid,
+          email: user.email,
+          animal: user.animal,
+          lastSeen: Date.now(),
+          status: 'playing',
+          joinedAt: serverTimestamp()
+        }
+      }
+    });
+    return { roomRef, roomStatus: 'playing', playerRole: 'animal2' };
+  }
+
+  return { roomRef, roomStatus: room.status || 'waiting', playerRole: null };
 }
 
-function moveTokenBackward(previousPosition) {
-  if (isMoving) return;
-  isMoving = true;
+let heartbeatInterval = null; // Moved outside to be accessible for clearing
+function startHeartbeat(pairId, playerRole, userUid) {
+  if (!playerRole) return;
 
-  const currentTile = document.querySelector(`.tile[data-index='${playerPosition}']`);
-  const token = currentTile.querySelector('.player-token');
-  if (token) currentTile.removeChild(token);
-
-  playerPosition = previousPosition;
-  const prevTile = document.querySelector(`.tile[data-index='${playerPosition}']`);
-  prevTile.appendChild(createPlayerToken());
-  isMoving = false;
+  // Heartbeat každých 5 sekund dle architecture.md
+  return setInterval(async () => {
+    const playerStatusRef = ref(db, `rooms/${pairId}/players/${playerRole}`);
+    try {
+      await update(playerStatusRef, {
+        // Use current client time for lastSeen, as serverTimestamp is async and might be delayed
+        lastSeen: Date.now(),
+        status: 'online'
+      });
+    } catch (err) {
+      console.error("Heartbeat failed", err);
+    }
+  }, 5000);
 }
 
-function handleLogout() {
-  localStorage.removeItem('uhkUser');
-  localStorage.removeItem('animal');
+async function persistDecision(pairId, playerRole, shared, user) {
+  const actionRef = ref(db, `rooms/${pairId}/actions/secret/${playerRole}`);
+  await set(actionRef, {
+    shared,
+    uid: user.uid,
+    animal: user.animal,
+    timestamp: serverTimestamp()
+  });
+}
+
+function redirectToLoginPage() {
   window.location.href = 'index.html';
 }
 
-export function initializeGame() {
-  const stored = getStoredUser();
-  const storedAnimal = localStorage.getItem('animal');
-
-  if (!stored && !storedAnimal) {
-    return redirectToLogin();
+export async function initializeGame() {
+  const user = getStoredUser();
+  if (!user || !user.animal || !user.pairId) {
+    return redirectToLoginPage();
   }
 
-  animal = storedAnimal || (stored && stored.animal) || 'zvíře';
-  userEmail = (stored && stored.email) || 'Neznámý uživatel';
+  updateNavbar(user.animal);
+  renderModule('secret');
+  showWaitingMessage('Připojuji tě ke správnému páru...', 'Vstupuji do hry');
 
-  updateNavbar();
-  createBoard();
+  // Oprava odhlášení: musí být i ve Firebase Auth
+  document.getElementById('logoutButton').addEventListener('click', async () => {
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error('SignOut error', err);
+    }
+    localStorage.removeItem(STORAGE_KEY_USER);
+    sessionStorage.removeItem(STORAGE_KEY_USER);
+    window.location.href = 'index.html';
+  });
 
-  document.getElementById('rollButton').addEventListener('click', rollDice);
-  document.getElementById('logoutButton').addEventListener('click', handleLogout);
-  document.getElementById('closeModal').addEventListener('click', hideQuestionModal);
-  document.querySelectorAll('.answer-button').forEach((button) => {
-    button.addEventListener('click', handleAnswer);
+  const { roomRef, playerRole } = await joinRoom(user.pairId, user);
+  let currentPlayerRole = playerRole; // Initialize with the role from joinRoom
+
+  onValue(roomRef, (snapshot) => {
+    const room = snapshot.val();
+    if (!room) {
+      showWaitingMessage('Vytvářím herní místnost...');
+      return;
+    }
+
+    currentPlayerRole = getPlayerRole(room, user.uid);
+    if (currentPlayerRole && !heartbeatInterval) { // Start heartbeat only once
+      heartbeatInterval = startHeartbeat(user.pairId, currentPlayerRole, user.uid);
+    }
+
+    const currentModuleId = room.currentModule;
+    const partnerRole = currentPlayerRole === 'animal1' ? 'animal2' : 'animal1';
+    const partner = room.players?.[partnerRole];
+    
+    // Parťák je offline pouze pokud už někdy byl online (má lastSeen) 
+    // a zároveň je místnost ve stavu playing (nečeká se na první připojení)
+    const isPartnerOffline = room.status === 'playing' && 
+                             partner && 
+                             partner.lastSeen && 
+                             (Date.now() - partner.lastSeen > 20000); // tolerance zvýšena na 20s
+
+    if (room.status !== 'waiting' && currentPlayerRole) { // Game is active and player has a role
+      // Kontrola, zda se parťák neodpojil (tolerance 15 sekund)
+      if (isPartnerOffline) {
+        showWaitingMessage('Parťák se odpojil, čekejte na návrat...', 'Spojení přerušeno');
+        setDecisionButtonsDisabled(true);
+        return; // Zastav další zpracování, pokud je parťák offline
+      }
+
+      renderModule(currentModuleId); // Vždy vykresli UI pro aktuální modul
+
+      const currentModuleActions = room.actions?.[currentModuleId];
+      const playerDecision = currentModuleActions?.[currentPlayerRole];
+      const partnerDecision = currentModuleActions?.[partnerRole];
+
+      if (currentModuleId === 'secret') {
+        if (playerDecision && partnerDecision) {
+          // Oba hráči se rozhodli pro modul 'secret'
+          const partnerShared = partnerDecision.shared;
+          const message = partnerShared ? 'Tvůj parťák se rozhodl kód SDÍLET!' : 'Tvůj parťák se rozhodl kód NECHÁT SI!';
+          showWaitingMessage(message + ' Přecházíme na další modul...', 'Rozhodnuto!');
+          setDecisionButtonsDisabled(true);
+
+          // Posun stavu modulu (pouze animal1 to dělá, aby se předešlo race conditions)
+          if (currentPlayerRole === 'animal1') {
+            // Malá prodleva pro zobrazení zprávy v UI před přechodem
+            setTimeout(async () => {
+              await update(roomRef, {
+                currentModule: 'help', // Další modul
+                status: 'module_help_active' // Nový status
+              });
+            }, 3000); // 3 sekundy prodleva
+          }
+        } else if (playerDecision && !partnerDecision) {
+          // Aktuální hráč se rozhodl, čeká na parťáka
+          showWaitingMessage('Čekám na tah parťáka...', 'Tvoje volba byla zaznamenána');
+          setDecisionButtonsDisabled(true);
+        } else {
+          // Aktuální hráč se ještě nerozhodl
+          showModule(); // Zobraz tlačítka pro rozhodování
+          setDecisionButtonsDisabled(false);
+        }
+      } else if (currentModuleId === 'help') {
+        // Logika pro modul 'help' (zatím placeholder)
+        showModule(); // Zobraz tlačítka modulu
+        setDecisionButtonsDisabled(false);
+      } else {
+        // Prozatím, pokud je jiný modul, zobrazíme ho a povolíme tlačítka
+        showModule();
+        setDecisionButtonsDisabled(false);
+      }
+    } else {
+      showWaitingMessage('Čekám, až se připojí druhý hráč...', 'Hledám parťáka');
+    }
+  });
+
+  document.getElementById('shareButton').addEventListener('click', async () => {
+    setDecisionButtonsDisabled(true);
+    if (currentPlayerRole) {
+      await persistDecision(user.pairId, currentPlayerRole, true, user);
+      // Listener onValue se postará o zobrazení zprávy a posun stavu
+    } else {
+      showWaitingMessage('Nelze uložit rozhodnutí. Zkus znovu načíst stránku.');
+    }
+  });
+
+  document.getElementById('keepButton').addEventListener('click', async () => {
+    setDecisionButtonsDisabled(true);
+    if (currentPlayerRole) {
+      await persistDecision(user.pairId, currentPlayerRole, false, user);
+      // Listener onValue se postará o zobrazení zprávy a posun stavu
+    } else {
+      showWaitingMessage('Nelze uložit rozhodnutí. Zkus znovu načíst stránku.');
+    }
   });
 }

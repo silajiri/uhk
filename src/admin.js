@@ -27,42 +27,48 @@ function showMessage(elementId, message, type = 'success') {
   }, 4000);
 }
 
-function setButtonLoading(btnId, isLoading) {
+function setButtonLoading(btnId, isLoading, originalText) {
   const btn = document.getElementById(btnId);
   if (isLoading) {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Ukládám...';
   } else {
     btn.disabled = false;
-    btn.textContent = btn.id === 'saveStudentsBtn' ? '✓ Uložit seznam žáků' : '+ Přidat otázku';
+    btn.textContent = originalText;
   }
 }
 
 function parseStudentsList(text) {
   const lines = text.trim().split('\n').filter(l => l.trim());
-  const students = [];
-  
+  const pairs = [];
+
   for (const line of lines) {
-    const [email, animal] = line.split(';').map(s => s.trim());
-    if (!email || !animal) {
-      throw new Error(`Neplatný řádek: "${line}". Formát: email;zvíře`);
+    const parts = line.split(';').map(s => s.trim());
+    if (parts.length !== 4) {
+      throw new Error(`Neplatný řádek: "${line}". Formát: email1;zvíře1;email2;zvíře2`);
     }
-    students.push({ email, animal });
+
+    const [email1, animal1, email2, animal2] = parts;
+    if (!email1 || !animal1 || !email2 || !animal2) {
+      throw new Error(`Neplatný řádek: "${line}". Všechny čtyři hodnoty musí být vyplněné.`);
+    }
+
+    pairs.push({ email1, animal1, email2, animal2 });
   }
-  
-  return students;
+
+  return pairs;
 }
 
 async function saveStudents() {
-  setButtonLoading('saveStudentsBtn', true);
+  setButtonLoading('saveStudentsBtn', true, '✓ Uložit seznam žáků');
   
   try {
     const text = document.getElementById('studentsList').value;
     if (!text.trim()) {
-      throw new Error('Prosím, zadejte seznam žáků');
+      throw new Error('Prosím, zadejte seznam předefinovaných párů žáků');
     }
 
-    const students = parseStudentsList(text);
+    const pairs = parseStudentsList(text);
     const idToken = await auth.currentUser.getIdToken();
 
     const response = await fetch(SAVE_DATA_URL, {
@@ -71,7 +77,7 @@ async function saveStudents() {
         'Authorization': `Bearer ${idToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ type: 'students', data: students })
+      body: JSON.stringify({ type: 'pairs', data: pairs })
     });
 
     const result = await response.json();
@@ -85,7 +91,7 @@ async function saveStudents() {
   } catch (err) {
     showMessage('studentsMessage', err.message, 'error');
   } finally {
-    setButtonLoading('saveStudentsBtn', false);
+    setButtonLoading('saveStudentsBtn', false, '✓ Uložit seznam žáků');
   }
 }
 
@@ -106,7 +112,7 @@ async function loadStudents() {
     }
 
     const idToken = await user.getIdToken();
-    const response = await fetch(`${SAVE_DATA_URL}?type=students`, {
+    const response = await fetch(`${SAVE_DATA_URL}?type=pairs`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${idToken}`
@@ -118,8 +124,22 @@ async function loadStudents() {
       throw new Error(result.message || 'Chyba při načítání studentů');
     }
 
+    // Pokud se nepodaří načíst páry (např. chybí pairId v DB), zkusíme načíst aspoň jednotlivce
+    if (result.data && result.data.length === 0) {
+      const resStud = await fetch(`${SAVE_DATA_URL}?type=students`, {
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      const studData = await resStud.json();
+      if (studData.status === 'success' && studData.data.length > 0) {
+        // Zobrazíme aspoň jednotlivce pro snadnější editaci
+        const lines = studData.data.map(s => `${s.email};${s.animal};;`);
+        document.getElementById('studentsList').value = lines.join('\n');
+        return;
+      }
+    }
+
     if (Array.isArray(result.data) && result.data.length > 0) {
-      const lines = result.data.map((student) => `${student.email};${student.animal}`);
+      const lines = result.data.map((pair) => `${pair.email1};${pair.animal1};${pair.email2};${pair.animal2}`);
       document.getElementById('studentsList').value = lines.join('\n');
     } else {
       document.getElementById('studentsList').value = '';
@@ -127,6 +147,42 @@ async function loadStudents() {
   } catch (err) {
     console.warn('loadStudents error', err);
     showMessage('studentsMessage', err.message, 'error');
+  }
+}
+
+async function loadQuestions() {
+  try {
+    const user = await new Promise((resolve) => {
+      if (auth.currentUser) {
+        return resolve(auth.currentUser);
+      }
+      const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+        unsubscribe();
+        resolve(currentUser);
+      });
+    });
+
+    if (!user) {
+      throw new Error('Uživatel není přihlášen');
+    }
+
+    const idToken = await user.getIdToken();
+    const response = await fetch(`${SAVE_DATA_URL}?type=questions`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${idToken}`
+      }
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || 'Chyba při načítání otázek');
+    }
+    questionsArray = Array.isArray(result.data) ? result.data : [];
+    renderQuestions();
+  } catch (err) {
+    console.warn('loadQuestions error', err);
+    showMessage('questionsMessage', err.message, 'error');
   }
 }
 
@@ -157,8 +213,9 @@ function addQuestion() {
   document.getElementById('optionC').value = '';
   document.getElementById('correctOption').value = '';
 
-  showMessage('questionsMessage', `Otázka přidána (celkem: ${questionsArray.length})`, 'success');
-  renderQuestions();
+
+  // After adding to local array, save the entire array to DB
+  saveQuestions();
 }
 
 function renderQuestions() {
@@ -191,9 +248,7 @@ async function saveQuestions() {
     return;
   }
 
-  const btn = document.getElementById('addQuestionBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Ukládám...';
+  setButtonLoading('addQuestionBtn', true, '+ Přidat otázku');
 
   try {
     const idToken = await auth.currentUser.getIdToken();
@@ -212,14 +267,12 @@ async function saveQuestions() {
       throw new Error(result.message || 'Chyba při ukládání');
     }
 
-    showMessage('questionsMessage', result.message, 'success');
-    questionsArray = [];
-    renderQuestions();
+    showMessage('questionsMessage', `Otázky uloženy! (celkem: ${questionsArray.length})`, 'success');
+    // No need to clear questionsArray here, as addQuestion just added one and we saved the whole list.
   } catch (err) {
     showMessage('questionsMessage', err.message, 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = '+ Přidat otázku';
+    setButtonLoading('addQuestionBtn', false, '+ Přidat otázku');
   }
 }
 
@@ -233,6 +286,7 @@ async function handleLogout() {
   try {
     await signOut(auth);
     localStorage.removeItem('uhkUser');
+    sessionStorage.removeItem('uhkUser');
     window.location.href = 'index.html';
   } catch (err) {
     console.error('Logout error:', err);
@@ -254,10 +308,12 @@ function checkAdminAccess() {
 export function initializeAdmin() {
   if (!checkAdminAccess()) return;
 
-  // Event listeners
+  // Registrace posluchačů okamžitě
+  document.getElementById('logoutBtn').addEventListener('click', handleLogout);
   document.getElementById('saveStudentsBtn').addEventListener('click', saveStudents);
   document.getElementById('addQuestionBtn').addEventListener('click', addQuestion);
   document.getElementById('clearQuestionsBtn').addEventListener('click', clearQuestions);
-  document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+
   loadStudents();
+  loadQuestions();
 }

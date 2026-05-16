@@ -10,7 +10,9 @@ const ALLOWED_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:8000',
   'http://127.0.0.1:3000',
-  'http://127.0.0.1:8000'
+  'http://127.0.0.1:8000',
+  'http://localhost:5500',
+  'http://127.0.0.1:5500'
 ];
 
 // List of authorized admin emails
@@ -84,7 +86,7 @@ exports.lookupMappingByEmail = functions.region('europe-west1').https.onRequest(
       status: 'success',
       role: 'student',
       ...(val.animal ? { animal: val.animal } : {}),
-      ...(val.room ? { room: val.room } : {}),
+      ...(val.pairId ? { pairId: val.pairId } : {}),
       email
     };
 
@@ -131,6 +133,32 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
       }
 
       const type = req.query.type || 'students';
+      if (type === 'pairs') {
+        const snap = await db.ref('/mappings').once('value');
+        const mappings = snap.val() || {};
+        const grouped = {};
+
+        Object.entries(mappings).forEach(([key, value]) => {
+          const email = key.replace(/,/g, '.');
+          const pairId = value.pairId || 'pair_unknown';
+          grouped[pairId] = grouped[pairId] || [];
+          grouped[pairId].push({ email, animal: value.animal || '' });
+        });
+
+        const pairs = Object.entries(grouped).map(([pairId, members]) => {
+          const [first = {}, second = {}] = members;
+          return {
+            pairId,
+            email1: first.email || '',
+            animal1: first.animal || '',
+            email2: second.email || '',
+            animal2: second.animal || ''
+          };
+        });
+
+        return res.status(200).json({ status: 'success', data: pairs });
+      }
+
       if (type === 'students') {
         const snap = await db.ref('/mappings').once('value');
         const mappings = snap.val() || {};
@@ -139,6 +167,12 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
           animal: value.animal || ''
         }));
         return res.status(200).json({ status: 'success', data: students });
+      }
+
+      if (type === 'questions') {
+        const snap = await db.ref('/questions').once('value');
+        const questions = snap.val() || [];
+        return res.status(200).json({ status: 'success', data: questions });
       }
 
       return res.status(400).json({ status: 'error', message: 'Neznámý typ operace' });
@@ -187,6 +221,34 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
     }
 
     // Save students mapping
+    if (type === 'pairs') {
+      if (!Array.isArray(data) || data.length === 0) {
+        return res.status(400).json({ status: 'error', message: 'data musí být neprázdné pole párů studentů' });
+      }
+
+      const mappings = {};
+      for (let index = 0; index < data.length; index += 1) {
+        const pair = data[index];
+        const pairId = `pair_${index + 1}`;
+
+        if (!pair.email1 || !pair.animal1 || !pair.email2 || !pair.animal2) {
+          return res.status(400).json({ status: 'error', message: 'Každý pár musí obsahovat email1, animal1, email2 i animal2' });
+        }
+
+        mappings[encodeEmailKey(pair.email1)] = {
+          animal: pair.animal1,
+          pairId
+        };
+        mappings[encodeEmailKey(pair.email2)] = {
+          animal: pair.animal2,
+          pairId
+        };
+      }
+
+      await db.ref('/mappings').set(mappings);
+      return res.status(200).json({ status: 'success', message: `Uloženo ${data.length} párů studentů` });
+    }
+
     if (type === 'students') {
       if (!Array.isArray(data) || data.length === 0) {
         return res.status(400).json({ status: 'error', message: 'data musí být neprázdné pole studentů' });
@@ -233,4 +295,3 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
 function encodeEmailKey(email) {
   return email.replace(/\./g, ',').toLowerCase();
 }
-

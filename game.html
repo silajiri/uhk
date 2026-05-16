@@ -1,26 +1,59 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UHK Hra - Hern� plocha</title>
-    <link rel="stylesheet" href="css/style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UHK Hra – Tajemství</title>
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-    <div style="text-align: center; margin-top: 50px;">
-        <h1>?? V�tej ve hre!</h1>
-        <p>Tvoje prirazen� zv�r�tko je: <strong id="player-animal">Nac�t�m...</strong></p>
-    </div>
+  <div class="game-page">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="player-badge" id="playerBadge">🐾</div>
+        <div class="player-status">
+          <span class="status-label">Tvé zvířátko:</span>
+          <span class="status-value" id="playerAnimalName">Načítám...</span>
+        </div>
+      </div>
+      <button class="logout-btn" id="logoutButton">Odhlásit se</button>
+    </header>
 
-    <script>
-        // Jednoduch� kontrola, kterou jste zminoval:
-        const animal = localStorage.getItem('animal'); // nebo jak to auth.js ulo�il
-        if (!animal) {
-            // Pokud ��k nen� prihl�en, vyhod�me ho zpet na login
-            window.location.href = 'index.html';
-        } else {
-            document.getElementById('player-animal').innerText = animal;
-        }
-    </script>
+    <main id="module-container">
+      <section class="module-card">
+        <div class="module-header">
+          <span class="module-tag">Modul 1</span>
+          <h1 id="moduleTitle">Sdílení klíče</h1>
+        </div>
+
+        <p class="module-description" id="moduleDescription">
+          Získal jsi tajný kód pro postup. Můžeš si ho nechat pro vlastní výhodu, nebo ho poslat svému anonymnímu parťákovi.
+        </p>
+
+        <div class="module-reflection" id="moduleReflection">
+          Věříš mu, že tě nepodrazí?
+        </div>
+
+        <div class="decision-grid">
+          <button class="choice-button choice-share" id="shareButton">
+            Ano, věřím mu<br /><span>Sdílet kód</span>
+          </button>
+          <button class="choice-button choice-keep" id="keepButton">
+            Ne, nevěřím<br /><span>Nechat si ho</span>
+          </button>
+        </div>
+
+        <div class="waiting-panel hidden" id="waitingPanel">
+          <div class="waiting-title">Tvoje volba byla zaznamenána.</div>
+          <div class="waiting-text">Čekám na tah parťáka...</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module">
+    import { initializeGame } from './src/game.js';
+    initializeGame();
+  </script>
 </body>
 </html>

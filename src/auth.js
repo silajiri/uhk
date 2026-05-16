@@ -58,8 +58,13 @@ export async function loginWithGoogle() {
       throw new Error(errorMessage);
     }
 
+    if (data.role !== 'admin' && !data.pairId) {
+      throw new Error('Žádný předdefinovaný pár nebyl přiřazen. Kontaktujte učitele.');
+    }
+
     const userData = {
-      animal: data.animal,
+      animal: data.animal || '',
+      pairId: data.pairId || '',
       status: data.status,
       role: data.role || 'student',
       email: user.email,
@@ -67,7 +72,12 @@ export async function loginWithGoogle() {
       uid: user.uid
     };
 
-    localStorage.setItem('uhkUser', JSON.stringify(userData));
+    try {
+      localStorage.setItem('uhkUser', JSON.stringify(userData));
+    } catch (err) {
+      console.warn('localStorage unavailable, storing in memory');
+      sessionStorage.setItem('uhkUser', JSON.stringify(userData));
+    }
     
     // Redirect based on role
     if (data.role === 'admin') {
