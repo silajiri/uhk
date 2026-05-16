@@ -5,10 +5,11 @@
 
 ## Firebase Security Rules
 - Zákaz čtení uzlu `mappings` pro běžné hráče.
-- Matchmaking se provádí přes volatelnou Cloud Function `lookupMappingByEmail`; klient nikdy nečte uzel `/mappings` přímo.
-- Povoleno čtení pouze pro kontext místnosti, kde je daný hráč součástí.
+- Zákaz čtení uzlu `profiles` pro běžné hráče (obsahuje skutečná jména).
+- Matchmaking se provádí přes Cloud Function `lookupMappingByEmail`.
+- **Přístup k místnosti:** Povoleno čtení a zápis do `/rooms/{roomId}` pouze pokud `auth.uid` odpovídá `uid1` nebo `uid2` uloženému v dané místnosti.
 - Odemknutí reflexe se řídí `teacherControl/reflectionUnlocked`.
-- `/mappings` a `/questions` mohou být zapisovány **POUZE** přes Cloud Function `saveGameData` (klienti: `.write: false`).
+- `/mappings`, `/profiles` a `/questions` mohou být zapisovány **POUZE** administrátorem přes Cloud Function `saveGameData`.
 
 ## Origin-based Access Control
 Aby byly data chráněna před neoprávněným přístupem:

@@ -240,6 +240,34 @@
       border: none;
     }
 
+    /* Avatar Gallery Styles */
+    .avatar-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+
+    .avatar-card {
+      background: rgba(103, 82, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      padding: 1rem;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+
+    .avatar-card:hover {
+      transform: translateY(-3px);
+      background: rgba(103, 82, 255, 0.06);
+    }
+
+    .avatar-card img {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 0.5rem;
+    }
+
     @media (max-width: 600px) {
       .admin-header {
         flex-direction: column;
@@ -264,18 +292,48 @@
       <button class="logout-btn" id="logoutBtn">Odhlásit se</button>
     </header>
 
+    <!-- Správa profilů žáků -->
+    <section class="section">
+      <h2>👤 Profily žáků</h2>
+      <div id="profilesMessage" class="message"></div>
+      <div class="form-group">
+        <label for="profilesInput">Vložte seznam (email;jméno;avatar_id;zvíře):</label>
+        <textarea id="profilesInput" placeholder="jan.novak@skola.cz;Jan Novák;lion.svg;Kapradina"></textarea>
+        <div class="input-hint">Formát: email;Jméno Příjmení;avatar_id;Zvíře (česky)</div>
+      </div>
+      <button class="btn-primary" id="saveProfilesBtn">Uložit profily</button>
+    </section>
+
+    <!-- Galerie avatarů (Collapsible) -->
+    <section class="section">
+      <div id="avatarToggle" title="Klikněte pro zobrazení, pravým kliknutím vložíte seznam ručně" 
+           style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="margin: 0;">🖼️ Dostupní avataři</h2>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <button id="syncAvatarsBtn" class="btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; margin: 0;">
+            🔄 Synchronizovat z list.txt
+          </button>
+          <span id="avatarChevron" style="font-size: 1.2rem; transition: transform 0.3s;">▼</span>
+        </div>
+      </div>
+      <div id="avatarsMessage" class="message" style="margin-top: 1rem;"></div>
+      <div id="avatarContent" style="display: none; margin-top: 1.5rem;">
+        <div class="avatar-grid" id="avatarGrid"></div>
+      </div>
+    </section>
+
     <!-- Správa žáků -->
     <section class="section">
-      <h2>📚 Správa žáků</h2>
+      <h2>🤝 Párování (Matchmaking)</h2>
       <div id="studentsMessage" class="message"></div>
 
       <div class="form-group">
-        <label for="studentsList">Seznam párů žáků (email1;zvíře1;email2;zvíře2):</label>
+        <label for="studentsList">Seznam párů žáků (Jméno1;Jméno2):</label>
         <textarea
           id="studentsList"
-          placeholder="student1@uhk.cz;slon;student2@uhk.cz;lev&#10;student3@uhk.cz;tygr;student4@uhk.cz;zebra"
+          placeholder="Jan Novák;Tereza Svobodová"
         ></textarea>
-        <div class="input-hint">Formát: email1;zvíře1;email2;zvíře2 na každém řádku (předdefinované páry, ne náhodné párování)</div>
+        <div class="input-hint">Formát: Jméno Příjmení 1;Jméno Příjmení 2 (jeden pár na řádek)</div>
       </div>
 
       <div class="button-row">

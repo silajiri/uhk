@@ -76,17 +76,27 @@ exports.lookupMappingByEmail = functions.region('europe-west1').https.onRequest(
     }
 
     // Otherwise, treat as student and lookup mapping
-    const snap = await db.ref('/mappings').child(encodeEmailKey(email)).once('value');
-    const val = snap.val();
-    if (!val) {
+    const profileSnap = await db.ref('/profiles').child(encodeEmailKey(email)).once('value');
+    const profile = profileSnap.val();
+
+    if (!profile) {
+      return res.status(404).json({ status: 'error', message: 'Profil nenalezen. Kontaktujte učitele.' });
+    }
+
+    const mappingSnap = await db.ref('/mappings').child(encodeEmailKey(email)).once('value');
+    const mapping = mappingSnap.val();
+
+    if (!mapping && !isAdmin(email)) {
       return res.status(404).json({ status: 'error', message: 'Nebylo nalezeno mapování pro tento e-mail' });
     }
 
     const response = {
       status: 'success',
       role: 'student',
-      ...(val.animal ? { animal: val.animal } : {}),
-      ...(val.pairId ? { pairId: val.pairId } : {}),
+      animal: profile.animal || 'Anonymní tvor',
+      pairId: mapping ? mapping.pairId : '',
+      avatar: profile.avatar || 'default.svg',
+      realName: profile.name || 'Anonym',
       email
     };
 
@@ -134,29 +144,44 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
 
       const type = req.query.type || 'students';
       if (type === 'pairs') {
-        const snap = await db.ref('/mappings').once('value');
-        const mappings = snap.val() || {};
+        const [mapSnap, profSnap] = await Promise.all([
+          db.ref('/mappings').once('value'),
+          db.ref('/profiles').once('value')
+        ]);
+        const mappings = mapSnap.val() || {};
+        const profiles = profSnap.val() || {};
+        
         const grouped = {};
-
-        Object.entries(mappings).forEach(([key, value]) => {
-          const email = key.replace(/,/g, '.');
-          const pairId = value.pairId || 'pair_unknown';
-          grouped[pairId] = grouped[pairId] || [];
-          grouped[pairId].push({ email, animal: value.animal || '' });
+        Object.entries(mappings).forEach(([key, val]) => {
+          const pId = val.pairId;
+          if (!grouped[pId]) grouped[pId] = [];
+          grouped[pId].push(profiles[key]?.name || 'Neznámý');
         });
 
-        const pairs = Object.entries(grouped).map(([pairId, members]) => {
-          const [first = {}, second = {}] = members;
-          return {
-            pairId,
-            email1: first.email || '',
-            animal1: first.animal || '',
-            email2: second.email || '',
-            animal2: second.animal || ''
-          };
-        });
+        const data = Object.entries(grouped).map(([pId, names]) => ({
+          pairId: pId,
+          name1: names[0] || '',
+          name2: names[1] || ''
+        }));
+        return res.status(200).json({ status: 'success', data });
+      }
 
-        return res.status(200).json({ status: 'success', data: pairs });
+      if (type === 'avatars') {
+        const snap = await db.ref('/config/avatars').once('value');
+        const list = snap.val() || ['elephant.svg', 'lion.svg']; // defaultní fallback
+        return res.status(200).json({ status: 'success', data: list });
+      }
+
+      if (type === 'profiles') {
+        const snap = await db.ref('/profiles').once('value');
+        const profiles = snap.val() || {};
+        const list = Object.entries(profiles).map(([key, value]) => ({
+          email: key.replace(/,/g, '.'),
+          name: value.name,
+          avatar: value.avatar,
+          animal: value.animal
+        }));
+        return res.status(200).json({ status: 'success', data: list });
       }
 
       if (type === 'students') {
@@ -229,24 +254,32 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
       const mappings = {};
       for (let index = 0; index < data.length; index += 1) {
         const pair = data[index];
-        const pairId = `pair_${index + 1}`;
+        const pairId = `pair_${Date.now()}_${index + 1}`;
 
         if (!pair.email1 || !pair.animal1 || !pair.email2 || !pair.animal2) {
           return res.status(400).json({ status: 'error', message: 'Každý pár musí obsahovat email1, animal1, email2 i animal2' });
         }
 
         mappings[encodeEmailKey(pair.email1)] = {
-          animal: pair.animal1,
+          animal: pair.animal1.trim(),
           pairId
         };
         mappings[encodeEmailKey(pair.email2)] = {
-          animal: pair.animal2,
+          animal: pair.animal2.trim(),
           pairId
         };
       }
 
       await db.ref('/mappings').set(mappings);
       return res.status(200).json({ status: 'success', message: `Uloženo ${data.length} párů studentů` });
+    }
+
+    if (type === 'avatars') {
+      if (!Array.isArray(data)) {
+        return res.status(400).json({ status: 'error', message: 'data musí být pole názvů souborů' });
+      }
+      await db.ref('/config/avatars').set(data);
+      return res.status(200).json({ status: 'success', message: 'Seznam dostupných avatarů aktualizován' });
     }
 
     if (type === 'students') {

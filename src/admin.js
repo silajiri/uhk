@@ -20,6 +20,10 @@ const db = getDatabase(app);
 
 // Questions array (temporary storage in memory)
 let questionsArray = [];
+let studentProfiles = [];
+let availableAvatars = [];
+
+const AVATAR_PATH = 'assets/avatars/';
 
 function showMessage(elementId, message, type = 'success') {
   const el = document.getElementById(elementId);
@@ -46,17 +50,17 @@ function parseStudentsList(text) {
   const pairs = [];
 
   for (const line of lines) {
-    const parts = line.split(';').map(s => s.trim());
-    if (parts.length !== 4) {
-      throw new Error(`Neplatný řádek: "${line}". Formát: email1;zvíře1;email2;zvíře2`);
+    const parts = line.split(';').filter(p => p.trim()).map(s => s.trim());
+    if (parts.length !== 2) {
+      throw new Error(`Neplatný řádek: "${line}". Formát: Jméno1;Jméno2`);
     }
 
-    const [email1, animal1, email2, animal2] = parts;
-    if (!email1 || !animal1 || !email2 || !animal2) {
-      throw new Error(`Neplatný řádek: "${line}". Všechny čtyři hodnoty musí být vyplněné.`);
+    const [name1, name2] = parts;
+    if (!name1 || !name2) {
+      throw new Error(`Neplatný řádek: "${line}". Obě jména musí být vyplněná.`);
     }
 
-    pairs.push({ email1, animal1, email2, animal2 });
+    pairs.push({ name1, name2 });
   }
 
   return pairs;
@@ -141,8 +145,8 @@ async function loadStudents() {
       }
     }
 
-    if (Array.isArray(result.data) && result.data.length > 0) {
-      const lines = result.data.map((pair) => `${pair.email1};${pair.animal1};${pair.email2};${pair.animal2}`);
+    if (result.status === 'success' && Array.isArray(result.data)) {
+      const lines = result.data.map((pair) => `${pair.name1};${pair.name2}`);
       document.getElementById('studentsList').value = lines.join('\n');
     } else {
       document.getElementById('studentsList').value = '';
@@ -338,6 +342,157 @@ function checkAdminAccess() {
   return true;
 }
 
+async function saveProfiles() {
+  const text = document.getElementById('profilesInput').value.trim();
+  if (!text) return;
+  
+  const lines = text.split('\n');
+  const profiles = lines.map(line => {
+    const [email, name, avatar, animal] = line.split(';').map(s => s.trim());
+    return { email, name, avatar, animal };
+  });
+
+  const idToken = await auth.currentUser.getIdToken();
+  await fetch(SAVE_DATA_URL, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'profiles', data: profiles })
+  });
+  showMessage('profilesMessage', 'Profily uloženy');
+  await loadProfiles();
+}
+
+async function loadProfiles() {
+  const idToken = await auth.currentUser.getIdToken();
+  const resp = await fetch(`${SAVE_DATA_URL}?type=profiles`, {
+    headers: { 'Authorization': `Bearer ${idToken}` }
+  });
+  const result = await resp.json();
+  if (result.status === 'success') {
+    studentProfiles = result.data;
+    // Zde by se v budoucnu naplnily dropdowny v UI pro párování
+  }
+}
+
+async function loadAvatars() {
+  try {
+    // 1. Priorita: Zkusíme načíst statický manifest list.txt z adresáře
+    const fileResp = await fetch(`${AVATAR_PATH}list.txt`);
+    if (fileResp.ok) {
+      const text = await fileResp.text();
+      const list = text.split(/[;\r\n]+/).map(s => s.trim()).filter(s => s);
+      if (list.length > 0) {
+        console.log(`Načteno ${list.length} avatarů z list.txt`);
+        availableAvatars = list;
+        renderAvatarGrid();
+        return;
+      }
+    }
+
+    // 2. Fallback: Načtení z Firebase databáze
+    const idToken = await auth.currentUser.getIdToken();
+    const resp = await fetch(`${SAVE_DATA_URL}?type=avatars`, {
+      headers: { 'Authorization': `Bearer ${idToken}` }
+    });
+    const result = await resp.json();
+    if (result.status === 'success') {
+      availableAvatars = result.data;
+      renderAvatarGrid();
+    }
+  } catch (err) {
+    console.error('Chyba při načítání avatarů:', err);
+  }
+}
+
+async function syncAvatarsFromFile() {
+  const btn = document.getElementById('syncAvatarsBtn');
+  setButtonLoading('syncAvatarsBtn', true, '🔄 Synchronizovat z list.txt');
+  
+  try {
+    const resp = await fetch(`${AVATAR_PATH}list.txt`);
+    if (!resp.ok) throw new Error('Soubor list.txt v adresáři avatars nebyl nalezen.');
+
+    const text = await resp.text();
+    const list = text.split(/[;\r\n]+/).map(s => s.trim()).filter(s => s);
+    
+    if (list.length === 0) throw new Error('Soubor list.txt je prázdný.');
+
+    const idToken = await auth.currentUser.getIdToken();
+    await fetch(SAVE_DATA_URL, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'avatars', data: list })
+    });
+
+    showMessage('avatarsMessage', `Úspěšně synchronizováno ${list.length} avatarů.`, 'success');
+    await loadAvatars();
+  } catch (err) {
+    console.error('Sync error:', err);
+    showMessage('avatarsMessage', err.message, 'error');
+  } finally {
+    setButtonLoading('syncAvatarsBtn', false, '🔄 Synchronizovat z list.txt');
+  }
+}
+
+async function saveAvatars() {
+  const input = prompt('Vložte seznam názvů souborů (oddělené novým řádkem nebo středníkem):');
+  if (!input) return;
+
+  // Opraveno: Odstraněna duplicitní deklarace 'list' a sjednoceno rozdělení
+  const list = input.split(/[;\r\n]+/).map(s => s.trim()).filter(s => s);
+  
+  if (list.length === 0) {
+    showMessage('avatarsMessage', 'Nebyly nalezeny žádné platné názvy souborů.', 'error');
+    return;
+  }
+
+  console.log(`Detekováno ${list.length} avatarů k uložení.`);
+  const idToken = await auth.currentUser.getIdToken();
+  
+  try {
+    await fetch(SAVE_DATA_URL, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'avatars', data: list })
+    });
+    showMessage('profilesMessage', 'Seznam avatarů aktualizován');
+    showMessage('avatarsMessage', `Úspěšně aktualizováno ${list.length} avatarů.`, 'success');
+    await loadAvatars();
+  } catch (err) {
+    alert('Chyba při ukládání: ' + err.message);
+    console.error('Save avatars error:', err);
+    showMessage('avatarsMessage', 'Chyba při ukládání: ' + err.message, 'error');
+  }
+}
+
+function renderAvatarGrid() {
+  const grid = document.getElementById('avatarGrid');
+  grid.innerHTML = availableAvatars.map(filename => `
+    <div class="avatar-card">
+      <img src="${AVATAR_PATH}${filename}" alt="${filename}" onerror="this.src='${AVATAR_PATH}default.svg'">
+      <div class="input-hint" style="font-family: monospace; user-select: all;">${filename}</div>
+    </div>
+  `).join('');
+}
+
+function setupAvatarGalleryToggle() {
+  const toggle = document.getElementById('avatarToggle');
+  const content = document.getElementById('avatarContent');
+  const chevron = document.getElementById('avatarChevron');
+
+  // Collapsible logika
+  toggle.addEventListener('click', () => {
+    const isHidden = content.style.display === 'none';
+    content.style.display = isHidden ? 'grid' : 'none';
+    chevron.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+    
+    // Plynulý scroll při otevření
+    if (isHidden) {
+      setTimeout(() => content.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+    }
+  });
+}
+
 export function initializeAdmin() {
   if (!checkAdminAccess()) return;
 
@@ -347,7 +502,19 @@ export function initializeAdmin() {
   document.getElementById('addQuestionBtn').addEventListener('click', addQuestion);
   document.getElementById('clearQuestionsBtn').addEventListener('click', clearQuestions);
   document.getElementById('resetRoomsBtn').addEventListener('click', resetRooms);
+  document.getElementById('saveProfilesBtn').addEventListener('click', saveProfiles);
+  document.getElementById('avatarToggle').addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    saveAvatars();
+  });
+  document.getElementById('syncAvatarsBtn').addEventListener('click', (e) => {
+    e.stopPropagation(); // Zabráníme rozbalení/zabalení sekce při kliku na tlačítko
+    syncAvatarsFromFile();
+  });
 
   loadStudents();
   loadQuestions();
+  loadProfiles();
+  loadAvatars();
+  setupAvatarGalleryToggle();
 }

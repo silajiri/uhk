@@ -15,12 +15,14 @@ Zásada: Firebase Realtime Database je jediným zdrojem pravdy pro aktuální st
 
 Stavy místnosti (příklad):
 - `waiting` – čekání na oba hráče
-- `module_<name>_active` – aktivní modul (např. `module_secret_active`)
+- `playing` – oba hráči jsou připojeni a hra probíhá
 - `reflection_started` – reflexní fáze odemčena učitelem
 - `finished` – hra dokončena
 
 Klientská logika:
-- Klient periodicky (např. každých 5 s) aktualizuje `players/{animal}/lastSeen` a `players/{animal}/status` (heartbeat).
+- **Matchmaking:** Probíhá na základě e-mailu žáka. Po přihlášení volá klient Cloud Function `lookupMappingByEmail`, která vrátí `pairId` a přiřazené zvíře (`animal`).
+- **Připojení:** Hráč se připojuje do Realtime Database na cestu `/rooms/{pairId}`. První připojený nastavuje `player1` a `uid1`, druhý `player2` a `uid2`.
+- **Heartbeat:** Klient periodicky (každých 5 s) aktualizuje svůj stav v místnosti pro detekci odpojení partnera.
 - Při reconnectu klient načte aktuální stav z `/rooms/{roomId}` a obnoví UI do odpovídající fáze.
 - UI musí podporovat zobrazení stavu partnera (online/offline/disconnected) a jasnou hlášku: "Parťák se odpojil, čekejte na návrat".
 
