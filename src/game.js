@@ -10,14 +10,18 @@ const MODULES = {
     tag: 'Modul 1',
     title: 'Sdílení klíče',
     description: 'Získal jsi tajný kód pro postup. Můžeš si ho nechat pro vlastní výhodu, nebo ho poslat svému anonymnímu parťákovi.',
-    reflection: 'Věříš mu, že tě nepodrazí?'
+    reflection: 'Věříš mu, že tě nepodrazí?',
+    btnShare: 'Ano, věřím mu<br><span>Sdílet kód</span>',
+    btnKeep: 'Ne, nevěřím<br><span>Nechat si ho</span>'
   },
   help: { // Placeholder for the next module
     id: 'help',
     tag: 'Modul 2',
     title: 'Obranný štít',
     description: 'Tvůj parťák je v nesnázích. Pomůžeš mu, i když tě to něco stojí?',
-    reflection: 'Zastane se mě parťák, i když ho to něco stojí?'
+    reflection: 'Zastane se mě parťák, i když ho to něco stojí?',
+    btnShare: 'Ano, pomůžu<br><span>Osvobodit parťáka</span>',
+    btnKeep: 'Ne, nepomůžu<br><span>Šetřit energii</span>'
   }
 };
 
@@ -76,6 +80,9 @@ function renderModule(moduleId) {
   document.getElementById('moduleTitle').textContent = module.title;
   document.getElementById('moduleDescription').textContent = module.description;
   document.getElementById('moduleReflection').textContent = module.reflection;
+  console.log(`Rendering module: ${module.title} (${moduleId})`);
+  document.getElementById('shareButton').innerHTML = module.btnShare || 'Ano';
+  document.getElementById('keepButton').innerHTML = module.btnKeep || 'Ne';
 }
 
 function showWaitingMessage(message = 'Čekám na parťáka...', title = 'Pracuji...') {
@@ -84,7 +91,10 @@ function showWaitingMessage(message = 'Čekám na parťáka...', title = 'Pracuj
   document.getElementById('waitingPanel').classList.remove('hidden');
   
   document.getElementById('waitingText').textContent = message;
-  document.querySelector('#waitingPanel .waiting-title').textContent = title;
+  const titleEl = document.getElementById('waitingTitle');
+  if (titleEl) {
+    titleEl.textContent = title;
+  }
 }
 
 function showModule() {
@@ -94,6 +104,7 @@ function showModule() {
 }
 
 function setDecisionButtonsDisabled(isDisabled) {
+  console.log(`setDecisionButtonsDisabled: Setting buttons disabled state to ${isDisabled}.`);
   document.getElementById('shareButton').disabled = isDisabled;
   document.getElementById('keepButton').disabled = isDisabled;
 }
@@ -136,10 +147,12 @@ async function joinRoom(pairId, user) {
   const isPlayer2 = players.animal2?.uid === user.uid;
 
   if (isPlayer1) {
+    await update(ref(db, `rooms/${pairId}/players/animal1`), { lastSeen: Date.now(), status: 'online' });
     return { roomRef, roomStatus: room.status || 'waiting', playerRole: 'animal1' };
   }
 
   if (isPlayer2) {
+    await update(ref(db, `rooms/${pairId}/players/animal2`), { lastSeen: Date.now(), status: 'online' });
     return { roomRef, roomStatus: room.status || 'waiting', playerRole: 'animal2' };
   }
 
@@ -184,8 +197,8 @@ function startHeartbeat(pairId, playerRole, userUid) {
   }, 5000);
 }
 
-async function persistDecision(pairId, playerRole, shared, user) {
-  const actionRef = ref(db, `rooms/${pairId}/actions/secret/${playerRole}`);
+async function persistDecision(pairId, moduleId, playerRole, shared, user) {
+  const actionRef = ref(db, `rooms/${pairId}/actions/${moduleId}/${playerRole}`);
   await set(actionRef, {
     shared,
     uid: user.uid,
@@ -198,6 +211,8 @@ function redirectToLoginPage() {
   window.location.href = 'index.html';
 }
 
+let activeModuleId = 'secret';
+
 export async function initializeGame() {
   const user = getStoredUser();
   if (!user || !user.animal || !user.pairId) {
@@ -207,6 +222,8 @@ export async function initializeGame() {
   updateNavbar(user.animal);
   renderModule('secret');
   showWaitingMessage('Připojuji tě ke správnému páru...', 'Vstupuji do hry');
+
+  console.log('Inicializace hry pro uživatele:', user.email, 'Role v localStorage:', user.animal);
 
   // Oprava odhlášení: musí být i ve Firebase Auth
   document.getElementById('logoutButton').addEventListener('click', async () => {
@@ -221,13 +238,22 @@ export async function initializeGame() {
     window.location.href = 'index.html';
   });
 
-  const { roomRef, playerRole } = await joinRoom(user.pairId, user);
-  let currentPlayerRole = playerRole; // Initialize with the role from joinRoom
+  // Získáme referenci na místnost a roli
+  const joinResult = await joinRoom(user.pairId, user);
+  const roomRef = joinResult.roomRef;
+  let currentPlayerRole = joinResult.playerRole;
+  activeModuleId = 'secret';
+
+  if (!currentPlayerRole) {
+    showWaitingMessage('Nepodařilo se přiřadit herní roli. Zkus se přihlásit znovu.', 'Chyba role');
+    return;
+  }
 
   onValue(roomRef, (snapshot) => {
     const room = snapshot.val();
     if (!room) {
-      showWaitingMessage('Vytvářím herní místnost...');
+      // Pokud místnost zmizela (např. reset v adminu), restartujeme hru
+      window.location.reload();
       return;
     }
 
@@ -237,6 +263,7 @@ export async function initializeGame() {
     }
 
     const currentModuleId = room.currentModule;
+    activeModuleId = currentModuleId;
     const partnerRole = currentPlayerRole === 'animal1' ? 'animal2' : 'animal1';
     const partner = room.players?.[partnerRole];
     
@@ -245,7 +272,10 @@ export async function initializeGame() {
     const isPartnerOffline = room.status === 'playing' && 
                              partner && 
                              partner.lastSeen && 
-                             (Date.now() - partner.lastSeen > 20000); // tolerance zvýšena na 20s
+                             (Date.now() - partner.lastSeen > 25000); // tolerance zvýšena na 20s
+
+    console.log('onValue listener triggered. Current room state:', room);
+    console.log('Stav místnosti:', room.status, 'Modul:', currentModuleId, 'Partner offline:', isPartnerOffline);
 
     if (room.status !== 'waiting' && currentPlayerRole) { // Game is active and player has a role
       // Kontrola, zda se parťák neodpojil (tolerance 15 sekund)
@@ -289,9 +319,24 @@ export async function initializeGame() {
           setDecisionButtonsDisabled(false);
         }
       } else if (currentModuleId === 'help') {
-        // Logika pro modul 'help' (zatím placeholder)
-        showModule(); // Zobraz tlačítka modulu
-        setDecisionButtonsDisabled(false);
+        if (playerDecision && partnerDecision) {
+          // Vyhodnocení modulu help
+          const partnerHelped = partnerDecision.shared;
+          const message = partnerHelped ? 'Parťák tě OSVOBODIL ze štítu!' : 'Parťák se rozhodl ŠETŘIT energii.';
+          showWaitingMessage(message + ' Hra prozatím končí.', 'Výsledek modulu');
+          setDecisionButtonsDisabled(true);
+          
+          // Zde by následoval přechod na další modul, pokud by byl definován
+          if (currentPlayerRole === 'animal1') {
+             // update(roomRef, { status: 'finished' });
+          }
+        } else if (playerDecision && !partnerDecision) {
+          showWaitingMessage('Čekám na rozhodnutí parťáka...', 'Tvá volba uložena');
+          setDecisionButtonsDisabled(true);
+        } else {
+          showModule();
+          setDecisionButtonsDisabled(false);
+        }
       } else {
         // Prozatím, pokud je jiný modul, zobrazíme ho a povolíme tlačítka
         showModule();
@@ -305,7 +350,7 @@ export async function initializeGame() {
   document.getElementById('shareButton').addEventListener('click', async () => {
     setDecisionButtonsDisabled(true);
     if (currentPlayerRole) {
-      await persistDecision(user.pairId, currentPlayerRole, true, user);
+      await persistDecision(user.pairId, activeModuleId, currentPlayerRole, true, user);
       // Listener onValue se postará o zobrazení zprávy a posun stavu
     } else {
       showWaitingMessage('Nelze uložit rozhodnutí. Zkus znovu načíst stránku.');
@@ -315,7 +360,7 @@ export async function initializeGame() {
   document.getElementById('keepButton').addEventListener('click', async () => {
     setDecisionButtonsDisabled(true);
     if (currentPlayerRole) {
-      await persistDecision(user.pairId, currentPlayerRole, false, user);
+      await persistDecision(user.pairId, activeModuleId, currentPlayerRole, false, user);
       // Listener onValue se postará o zobrazení zprávy a posun stavu
     } else {
       showWaitingMessage('Nelze uložit rozhodnutí. Zkus znovu načíst stránku.');

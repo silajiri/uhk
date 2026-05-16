@@ -1,10 +1,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
 import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+import { getDatabase, ref, remove } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCq_5Ftr7L9c2zz7mFzVp4v-KfNdGuHyF8",
   authDomain: "uhk-game.firebaseapp.com",
   projectId: "uhk-game",
+  databaseURL: 'https://uhk-game-default-rtdb.europe-west1.firebasedatabase.app/',
   storageBucket: "uhk-game.firebasestorage.app",
   messagingSenderId: "1049280155064",
   appId: "1:1049280155064:web:d7c1862e73aebbcfed534d",
@@ -14,6 +16,7 @@ const firebaseConfig = {
 const SAVE_DATA_URL = 'https://europe-west1-uhk-game.cloudfunctions.net/saveGameData';
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getDatabase(app);
 
 // Questions array (temporary storage in memory)
 let questionsArray = [];
@@ -282,6 +285,36 @@ function clearQuestions() {
   showMessage('questionsMessage', 'Otázky vymazány', 'success');
 }
 
+async function resetRooms() {
+  const dialog = document.getElementById('resetConfirmDialog');
+  const confirmBtn = document.getElementById('confirmResetBtn');
+  const cancelBtn = document.getElementById('cancelResetBtn');
+
+  dialog.showModal();
+  cancelBtn.focus();
+
+  // Použijeme event listenery místo přímého přiřazení
+  const closeDialog = () => dialog.close();
+  cancelBtn.addEventListener('click', closeDialog, { once: true });
+
+  confirmBtn.addEventListener('click', async () => {
+    closeDialog();
+    setButtonLoading('resetRoomsBtn', true, '🗑️ Resetuji...');
+    
+    try {
+      console.log("Pokus o smazání uzlu /rooms...");
+      await remove(ref(db, 'rooms'));
+      console.log("Smazání úspěšné.");
+      showMessage('studentsMessage', 'Všechny herní místnosti byly smazány.', 'success');
+    } catch (err) {
+      console.error("Smazání selhalo:", err);
+      showMessage('studentsMessage', 'Chyba: ' + err.message, 'error');
+    } finally {
+      setButtonLoading('resetRoomsBtn', false, '🗑️ Resetovat herní místnosti');
+    }
+  }, { once: true });
+}
+
 async function handleLogout() {
   try {
     await signOut(auth);
@@ -313,6 +346,7 @@ export function initializeAdmin() {
   document.getElementById('saveStudentsBtn').addEventListener('click', saveStudents);
   document.getElementById('addQuestionBtn').addEventListener('click', addQuestion);
   document.getElementById('clearQuestionsBtn').addEventListener('click', clearQuestions);
+  document.getElementById('resetRoomsBtn').addEventListener('click', resetRooms);
 
   loadStudents();
   loadQuestions();

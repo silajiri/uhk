@@ -230,6 +230,16 @@
       }
     }
 
+    dialog::backdrop {
+      background: rgba(43, 33, 64, 0.5);
+      backdrop-filter: blur(4px);
+    }
+
+    dialog.section {
+      max-width: 450px;
+      border: none;
+    }
+
     @media (max-width: 600px) {
       .admin-header {
         flex-direction: column;
@@ -271,6 +281,9 @@
       <div class="button-row">
         <button class="btn-primary" id="saveStudentsBtn">
           <span>✓ Uložit seznam žáků</span>
+        </button>
+        <button class="btn-secondary" id="resetRoomsBtn" style="background: #ffe0e0; color: #e74c3c;">
+          <span>🗑️ Resetovat herní místnosti</span>
         </button>
       </div>
     </section>
@@ -322,6 +335,17 @@
       <div id="questionsList" class="questions-list" style="display: none;"></div>
     </section>
   </div>
+
+  <!-- Potvrzovací dialog pro reset místností -->
+  <dialog id="resetConfirmDialog" class="section">
+    <h2 style="color: var(--error); margin-bottom: 1rem;">⚠️ Potvrdit smazání</h2>
+    <p>Opravdu chcete smazat všechny herní místnosti? Tato akce je nevratná a vykopne všechny připojené hráče.</p>
+    <div class="button-row" style="margin-top: 2rem;">
+      <!-- Tlačítko pro zrušení, které bude defaultně zaostřeno -->
+      <button id="cancelResetBtn" class="btn-secondary">Zrušit (zachovat data)</button>
+      <button id="confirmResetBtn" class="btn-primary" style="background: var(--error);">Ano, smazat vše</button>
+    </div>
+  </dialog>
 
   <script type="module">
     import { initializeAdmin } from './src/admin.js';

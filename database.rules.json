@@ -7,6 +7,8 @@
       ".write": false
     },
     "rooms": {
+      ".read": "auth != null && (auth.token.email == 'sila.jiri@gmail.com' || auth.token.email == 'jiri.sila@gmail.com' || auth.token.email == 'sila.tereza@gmail.com' || auth.token.email == 'tereza.silova@zsjrk.cz')",
+      ".write": "auth != null && (auth.token.email == 'sila.jiri@gmail.com' || auth.token.email == 'jiri.sila@gmail.com' || auth.token.email == 'sila.tereza@gmail.com' || auth.token.email == 'tereza.silova@zsjrk.cz')",
       "$roomId": {
         ".read": "auth != null",
         ".write": "auth != null"
