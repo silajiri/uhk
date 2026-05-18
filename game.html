@@ -12,48 +12,17 @@
       <div class="topbar-left">
         <div class="player-badge" id="playerBadge">🐾</div>
         <div class="player-status">
-          <span class="status-label">Tvé zvířátko:</span>
           <span class="status-value" id="playerAnimalName">Načítám...</span>
         </div>
       </div>
       <button class="logout-btn" id="logoutButton">Odhlásit se</button>
     </header>
 
-    <main id="module-container">
-      <section class="module-card">
-        <div class="module-header">
-          <span class="module-tag">Modul 1</span>
-          <h1 id="moduleTitle">Sdílení klíče</h1>
-        </div>
-
-        <p class="module-description" id="moduleDescription">
-          Získal jsi tajný kód pro postup. Můžeš si ho nechat pro vlastní výhodu, nebo ho poslat svému anonymnímu parťákovi.
-        </p>
-
-        <div class="module-reflection" id="moduleReflection">
-          Věříš mu, že tě nepodrazí?
-        </div>
-
-        <div class="decision-grid">
-          <button class="choice-button choice-share" id="shareButton">
-            Ano, věřím mu<br /><span>Sdílet kód</span>
-          </button>
-          <button class="choice-button choice-keep" id="keepButton">
-            Ne, nevěřím<br /><span>Nechat si ho</span>
-          </button>
-        </div>
-
-        <div class="waiting-panel hidden" id="waitingPanel">
-          <div class="waiting-title" id="waitingTitle">Tvoje volba byla zaznamenána.</div>
-          <div class="waiting-text" id="waitingText">Čekám na tah parťáka...</div>
-        </div>
-      </section>
+    <main id="game-root">
+      <div class="status-message">Inicializace herního světa...</div>
     </main>
   </div>
 
-  <script type="module">
-    import { initializeGame } from './src/game.js';
-    initializeGame();
-  </script>
+  <script type="module" src="src/app.js"></script>
 </body>
 </html>

@@ -45,22 +45,33 @@ function setButtonLoading(btnId, isLoading, originalText) {
   }
 }
 
-function parseStudentsList(text) {
+function parseStudentsList(text, profiles) {
   const lines = text.trim().split('\n').filter(l => l.trim());
   const pairs = [];
 
   for (const line of lines) {
     const parts = line.split(';').filter(p => p.trim()).map(s => s.trim());
-    if (parts.length !== 2) {
-      throw new Error(`Neplatný řádek: "${line}". Formát: Jméno1;Jméno2`);
-    }
+    if (parts.length === 2) {
+      const [name1, name2] = parts;
+      
+      // Vyhledání profilů podle jména (case-insensitive)
+      const p1 = profiles.find(p => p.name.toLowerCase() === name1.toLowerCase());
+      const p2 = profiles.find(p => p.name.toLowerCase() === name2.toLowerCase());
 
-    const [name1, name2] = parts;
-    if (!name1 || !name2) {
-      throw new Error(`Neplatný řádek: "${line}". Obě jména musí být vyplněná.`);
-    }
+      if (!p1) throw new Error(`Žák "${name1}" nebyl nalezen v uložených profilech.`);
+      if (!p2) throw new Error(`Žák "${name2}" nebyl nalezen v uložených profilech.`);
 
-    pairs.push({ name1, name2 });
+      pairs.push({ 
+        email1: p1.email, animal1: p1.animal, 
+        email2: p2.email, animal2: p2.animal 
+      });
+    } else if (parts.length === 4) {
+      // Fallback pro starý formát (email1;animal1;email2;animal2)
+      const [email1, animal1, email2, animal2] = parts;
+      pairs.push({ email1, animal1, email2, animal2 });
+    } else {
+      throw new Error(`Neplatný řádek: "${line}". Použijte formát: Jméno 1; Jméno 2`);
+    }
   }
 
   return pairs;
@@ -72,10 +83,10 @@ async function saveStudents() {
   try {
     const text = document.getElementById('studentsList').value;
     if (!text.trim()) {
-      throw new Error('Prosím, zadejte seznam předefinovaných párů žáků');
+      throw new Error('Prosím, zadejte seznam párů ve formátu: Jméno1;Jméno2');
     }
 
-    const pairs = parseStudentsList(text);
+    const pairs = parseStudentsList(text, studentProfiles);
     const idToken = await auth.currentUser.getIdToken();
 
     const response = await fetch(SAVE_DATA_URL, {
@@ -104,6 +115,10 @@ async function saveStudents() {
 
 async function loadStudents() {
   try {
+    // 1. Nejdříve se ujistíme, že máme načtené profily pro překlad e-mail -> jméno
+    // studentProfiles se plní v loadProfiles()
+    if (studentProfiles.length === 0) await loadProfiles();
+
     const user = await new Promise((resolve) => {
       if (auth.currentUser) {
         return resolve(auth.currentUser);
@@ -138,15 +153,22 @@ async function loadStudents() {
       });
       const studData = await resStud.json();
       if (studData.status === 'success' && studData.data.length > 0) {
-        // Zobrazíme aspoň jednotlivce pro snadnější editaci
-        const lines = studData.data.map(s => `${s.email};${s.animal};;`);
-        document.getElementById('studentsList').value = lines.join('\n');
+        // Pokud nejsou páry, necháme pole prázdné nebo vypíšeme jména bez párů
         return;
       }
     }
 
     if (result.status === 'success' && Array.isArray(result.data)) {
-      const lines = result.data.map((pair) => `${pair.name1};${pair.name2}`);
+      const lines = result.data.map((p) => {
+        // Přeložíme e-maily z DB zpět na čitelná jména pomocí profilů v paměti
+        const profile1 = studentProfiles.find(s => s.email.toLowerCase() === p.email1.toLowerCase());
+        const profile2 = studentProfiles.find(s => s.email.toLowerCase() === p.email2.toLowerCase());
+        
+        const name1 = profile1 ? profile1.name : p.email1;
+        const name2 = profile2 ? profile2.name : p.email2;
+        
+        return `${name1};${name2}`;
+      });
       document.getElementById('studentsList').value = lines.join('\n');
     } else {
       document.getElementById('studentsList').value = '';
@@ -352,18 +374,45 @@ async function saveProfiles() {
     return { email, name, avatar, animal };
   });
 
-  const idToken = await auth.currentUser.getIdToken();
-  await fetch(SAVE_DATA_URL, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'profiles', data: profiles })
+  const user = await new Promise((resolve) => {
+    if (auth.currentUser) return resolve(auth.currentUser);
+    const unsubscribe = auth.onAuthStateChanged((u) => {
+      unsubscribe();
+      resolve(u);
+    });
   });
-  showMessage('profilesMessage', 'Profily uloženy');
-  await loadProfiles();
+
+  if (!user) return showMessage('profilesMessage', 'Uživatel není přihlášen', 'error');
+
+  const idToken = await user.getIdToken();
+  try {
+    const response = await fetch(SAVE_DATA_URL, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'profiles', data: profiles })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Server vrátil chybu');
+    
+    showMessage('profilesMessage', 'Profily byly úspěšně uloženy do DB');
+    await loadProfiles();
+  } catch (err) {
+    showMessage('profilesMessage', 'Chyba při ukládání: ' + err.message, 'error');
+  }
 }
 
 async function loadProfiles() {
-  const idToken = await auth.currentUser.getIdToken();
+  const user = await new Promise((resolve) => {
+    if (auth.currentUser) return resolve(auth.currentUser);
+    const unsubscribe = auth.onAuthStateChanged((u) => {
+      unsubscribe();
+      resolve(u);
+    });
+  });
+
+  if (!user) return;
+
+  const idToken = await user.getIdToken();
   const resp = await fetch(`${SAVE_DATA_URL}?type=profiles`, {
     headers: { 'Authorization': `Bearer ${idToken}` }
   });
@@ -390,7 +439,16 @@ async function loadAvatars() {
     }
 
     // 2. Fallback: Načtení z Firebase databáze
-    const idToken = await auth.currentUser.getIdToken();
+    const user = await new Promise((resolve) => {
+      if (auth.currentUser) return resolve(auth.currentUser);
+      const unsubscribe = auth.onAuthStateChanged((u) => {
+        unsubscribe();
+        resolve(u);
+      });
+    });
+
+    if (!user) return;
+    const idToken = await user.getIdToken();
     const resp = await fetch(`${SAVE_DATA_URL}?type=avatars`, {
       headers: { 'Authorization': `Bearer ${idToken}` }
     });

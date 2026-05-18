@@ -90,9 +90,18 @@ exports.lookupMappingByEmail = functions.region('europe-west1').https.onRequest(
       return res.status(404).json({ status: 'error', message: 'Nebylo nalezeno mapování pro tento e-mail' });
     }
 
+    // Propojení UID s místností pro Security Rules
+    if (mapping && mapping.pairId) {
+      const playerKey = mapping.role === 'player1' ? 'animal1' : 'animal2';
+      await db.ref(`/rooms/${mapping.pairId}/players/${playerKey}`).update({
+        uid: decodedToken.uid,
+        email: email
+      });
+    }
+
     const response = {
       status: 'success',
-      role: 'student',
+      role: mapping ? mapping.role : 'student',
       animal: profile.animal || 'Anonymní tvor',
       pairId: mapping ? mapping.pairId : '',
       avatar: profile.avatar || 'default.svg',
@@ -144,24 +153,27 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
 
       const type = req.query.type || 'students';
       if (type === 'pairs') {
-        const [mapSnap, profSnap] = await Promise.all([
-          db.ref('/mappings').once('value'),
-          db.ref('/profiles').once('value')
-        ]);
+        const mapSnap = await db.ref('/mappings').once('value');
         const mappings = mapSnap.val() || {};
-        const profiles = profSnap.val() || {};
         
         const grouped = {};
         Object.entries(mappings).forEach(([key, val]) => {
           const pId = val.pairId;
-          if (!grouped[pId]) grouped[pId] = [];
-          grouped[pId].push(profiles[key]?.name || 'Neznámý');
+          if (pId) {
+            if (!grouped[pId]) grouped[pId] = [];
+            grouped[pId].push({
+              email: val.email || key.replace(/,/g, '.').replace(/_at_/g, '@'),
+              animal: val.animal || ''
+            });
+          }
         });
 
-        const data = Object.entries(grouped).map(([pId, names]) => ({
+        const data = Object.entries(grouped).map(([pId, students]) => ({
           pairId: pId,
-          name1: names[0] || '',
-          name2: names[1] || ''
+          email1: students[0]?.email || '',
+          animal1: students[0]?.animal || '',
+          email2: students[1]?.email || '',
+          animal2: students[1]?.animal || ''
         }));
         return res.status(200).json({ status: 'success', data });
       }
@@ -176,7 +188,7 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
         const snap = await db.ref('/profiles').once('value');
         const profiles = snap.val() || {};
         const list = Object.entries(profiles).map(([key, value]) => ({
-          email: key.replace(/,/g, '.'),
+          email: key.replace(/,/g, '.').replace(/_at_/g, '@'),
           name: value.name,
           avatar: value.avatar,
           animal: value.animal
@@ -188,7 +200,7 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
         const snap = await db.ref('/mappings').once('value');
         const mappings = snap.val() || {};
         const students = Object.entries(mappings).map(([key, value]) => ({
-          email: key.replace(/,/g, '.'),
+          email: key.replace(/,/g, '.').replace(/_at_/g, '@'),
           animal: value.animal || ''
         }));
         return res.status(200).json({ status: 'success', data: students });
@@ -261,12 +273,16 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
         }
 
         mappings[encodeEmailKey(pair.email1)] = {
+          email: pair.email1.trim(),
           animal: pair.animal1.trim(),
-          pairId
+          pairId,
+          role: 'player1'
         };
         mappings[encodeEmailKey(pair.email2)] = {
+          email: pair.email2.trim(),
           animal: pair.animal2.trim(),
-          pairId
+          pairId,
+          role: 'player2'
         };
       }
 
@@ -295,10 +311,31 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
       // Write to /mappings
       const mappings = {};
       data.forEach((student) => {
-        mappings[encodeEmailKey(student.email)] = { animal: student.animal };
+        mappings[encodeEmailKey(student.email)] = { 
+          email: student.email.trim(),
+          animal: student.animal.trim() 
+        };
       });
       await db.ref('/mappings').set(mappings);
       return res.status(200).json({ status: 'success', message: `Uloženo ${data.length} studentů` });
+    }
+
+    if (type === 'profiles') {
+      if (!Array.isArray(data)) {
+        return res.status(400).json({ status: 'error', message: 'data musí být pole profilů' });
+      }
+      const profiles = {};
+      data.forEach(p => {
+        if (p.email) {
+          profiles[encodeEmailKey(p.email)] = {
+            name: (p.name || '').trim(),
+            avatar: (p.avatar || 'default.svg').trim(),
+            animal: (p.animal || '').trim()
+          };
+        }
+      });
+      await db.ref('/profiles').set(profiles);
+      return res.status(200).json({ status: 'success', message: `Uloženo ${Object.keys(profiles).length} profilů` });
     }
 
     // Save questions
@@ -326,5 +363,5 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
 
 // Helper: encode email into a DB-safe key (replace '.' with ',')
 function encodeEmailKey(email) {
-  return email.replace(/\./g, ',').toLowerCase();
+  return email.toLowerCase().trim().replace(/\./g, ',').replace(/@/g, '_at_');
 }

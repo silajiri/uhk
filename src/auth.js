@@ -67,6 +67,7 @@ export async function loginWithGoogle() {
       pairId: data.pairId || '',
       status: data.status,
       role: data.role || 'student',
+      avatar: data.avatar || 'default.svg',
       email: user.email,
       name: user.displayName,
       uid: user.uid

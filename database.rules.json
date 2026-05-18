@@ -6,12 +6,20 @@
       ".read": false,
       ".write": false
     },
+    "profiles": {
+      ".read": false,
+      ".write": false
+    },
+    "questions": {
+      ".read": "auth != null",
+      ".write": false
+    },
     "rooms": {
       ".read": "auth != null && (auth.token.email == 'sila.jiri@gmail.com' || auth.token.email == 'sila.tereza@gmail.com' || auth.token.email == 'tereza.silova@zsjrk.cz')",
       ".write": "auth != null && (auth.token.email == 'sila.jiri@gmail.com' || auth.token.email == 'sila.tereza@gmail.com' || auth.token.email == 'tereza.silova@zsjrk.cz')",
       "$roomId": {
-        ".read": "auth != null && (data.child('uid1').val() === auth.uid || data.child('uid2').val() === auth.uid)",
-        ".write": "auth != null && (data.child('uid1').val() === auth.uid || data.child('uid2').val() === auth.uid || !data.exists())"
+        ".read": "auth != null && (data.child('players/animal1/uid').val() === auth.uid || data.child('players/animal2/uid').val() === auth.uid)",
+        ".write": "auth != null && (data.child('players/animal1/uid').val() === auth.uid || data.child('players/animal2/uid').val() === auth.uid || !data.exists())"
       }
     }
   }
