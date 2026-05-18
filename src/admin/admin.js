@@ -53,14 +53,16 @@ async function initAdmin() {
     const lines = rawData.split('\n');
     const mappings = {};
 
+    const sanitize = (email) => email.toLowerCase().trim().replace(/\./g, ',').replace(/@/g, '_at_');
+
     try {
       lines.forEach((line, index) => {
         const [e1, a1, e2, a2] = line.split(';').map(s => s.trim());
         if (e1 && a1 && e2 && a2) {
           const pairId = `pair_${index + 1}`;
-          // Implementace dle security.md: emaily jako klíče s čárkou místo tečky
-          mappings[e1.replace(/\./g, ',')] = { email: e1, animal: a1, pairId };
-          mappings[e2.replace(/\./g, ',')] = { email: e2, animal: a2, pairId };
+          // Sjednocená sanitace dle GAME_MODULES_DEEP_DIVE.md
+          mappings[sanitize(e1)] = { email: e1, animal: a1, pairId, role: 'player1' };
+          mappings[sanitize(e2)] = { email: e2, animal: a2, pairId, role: 'player2' };
         }
       });
 

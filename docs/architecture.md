@@ -148,11 +148,11 @@ Poznámka: výše je koncept – bezpečnostní pravidla nutno upravit podle př
 
 Matchmaking je implementován jako bezpečná volatelná Cloud Function.
 - Volatelná funkce: `lookupMappingByEmail`
-- Nasazeno na: `https://us-central1-uhk-game.cloudfunctions.net/lookupMappingByEmail`
+- Nasazeno na: `https://europe-west1-uhk-game.cloudfunctions.net/lookupMappingByEmail`
 - Klient se přihlásí přes Google Workspace účet (Firebase Auth), získá autorizovaný token a pošle své e-mailové jméno do funkce.
 - Funkce načte `mappings/{encodedEmail}` z Realtime Database a vrátí pairing metadata včetně `pairId`.
 - Klient použije `pairId` k připojení do pevně definované `rooms/{pairId}` místnosti.
-- E-mailové klíče v DB jsou enkódovány tak, že `.` jsou nahrazeny čárkami `,`.
+- E-mailové klíče v DB jsou enkódovány tak, že `.` jsou nahrazeny čárkami `,` a `@` řetězcem `_at_`.
 
 Tento přístup zajistí, že:
 - Klient nečte přímo citlivou mapovací tabulku `/mappings`.

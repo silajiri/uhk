@@ -7,7 +7,7 @@
 - Zákaz čtení uzlu `mappings` pro běžné hráče.
 - Zákaz čtení uzlu `profiles` pro běžné hráče (obsahuje skutečná jména).
 - Matchmaking se provádí přes Cloud Function `lookupMappingByEmail`.
-- **Přístup k místnosti:** Povoleno čtení a zápis do `/rooms/{roomId}` pouze pokud `auth.uid` odpovídá `uid1` nebo `uid2` uloženému v dané místnosti.
+- **Přístup k místnosti:** Povoleno čtení a zápis do `/rooms/{roomId}` pouze pokud je uživatel autorizován a jeho e-mail odpovídá mapování pro danou místnost.
 - Odemknutí reflexe se řídí `teacherControl/reflectionUnlocked`.
 - `/mappings`, `/profiles` a `/questions` mohou být zapisovány **POUZE** administrátorem přes Cloud Function `saveGameData`.
 
