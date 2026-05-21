@@ -42,7 +42,7 @@ function updateNavbar(role, animal, avatar) {
   }
   if (badgeEl) {
     const avatarPath = `assets/avatars/${avatar || 'default.svg'}`;
-    badgeEl.innerHTML = `<img src="${avatarPath}" alt="Avatar" style="width:54px; height:54px; border-radius:50%; object-fit:cover;">`;
+    badgeEl.innerHTML = `<img src="${avatarPath}" alt="Avatar" style="width:42px; height:42px; border-radius:50%; object-fit:cover;">`;
     badgeEl.style.border = `2px solid ${roleColor}`;
     badgeEl.style.boxShadow = `0 0 12px ${roleColor}66`;
   }

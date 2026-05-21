@@ -82,11 +82,24 @@ Pokud Rys stoupne na past (hodnota 2):
 - Každý hráč má u svého teploměru svítící štítek **„TY“** (modrý/oranžový) pro rychlou orientaci.
 - Pokud hráč **nemá** krystal, má tlačítko **„Mrznu! Potřebuji teplo!“**.
 - Pokud hráč **má** krystal, vidí pulzující tlačítko **„Předat krystal parťákovi“**.
+- **Stav počasí (`#weather-status`):** Pod časomírou je zobrazen skleněný (glassmorphic) štítek indikující aktuální fázi klimatu a rychlost chladnutí. Mění se dynamicky s časem a barevně reaguje (modrá, žlutá, červená).
+- **Pulzující neonová časomíra:** Od 80. sekundy (fáze Blizzard) se časomíra zvětší, zčervená a začne pulzovat.
 - **Vstupní modal:** Před startem je nutné potvrdit instrukce kliknutím na *„👍 Přečetl jsem a rozumím“*.
 
-### B. Teplotní mechanika a gradient
-- Hráč bez krystalu mrzne – jeho teplota klesá o **-4 % za sekundu**.
-- Hráč s krystalem se zahřívá – jeho teplota roste o **+2 % za sekundu** (max 100 %).
+### B. Teplotní mechanika a gradient (Zrychlující se úbytek tepla)
+Pro zamezení matematické nemožnosti lineárního úbytku (který při parametrech -4/+2 dělal přežití 120s nemožným) a vytvoření herního tlaku je klima rozděleno do tří fází:
+1. **0. až 40. sekunda: ❄️ Mírný chlad**
+   - Hráč bez krystalu mrzne rychlostí **-2 % za sekundu**.
+   - Hráč s krystalem se zahřívá rychlostí **+4 % za sekundu** (netto zisk týmu +2 %/s).
+   - *Cíl:* Stabilizace a naplnění ukazatelů teploty na maximum.
+2. **40. až 80. sekunda: 💨 Silný mráz**
+   - Hráč bez krystalu mrzne rychlostí **-4 % za sekundu**.
+   - Hráč s krystalem se zahřívá rychlostí **+4 % za sekundu** (netto změna 0 %/s).
+   - *Cíl:* Udržení rovnováhy teplot střídáním krystalu.
+3. **80. až 120. sekunda: 🚨 BLIZZARD!**
+   - Hráč bez krystalu mrzne rychlostí **-7 % za sekundu**.
+   - Hráč s krystalem se zahřívá rychlostí **+5 % za sekundu** (netto úbytek týmu -2 %/s).
+   - *Cíl:* Extrémně rychlé střídání, hráč bez krystalu zmrzne za cca 14 sekund.
 - **Barevná animace:** Barva teploměru se dynamicky mění (interpoluje) od **červené** (100 %) přes **zelenou** (50 %) k **ledově modré** (0 %).
 - Pokud teplota hráče klesne pod 30 %, celá obrazovka se zbarví do mrazivého nádechu.
 
@@ -105,57 +118,66 @@ Pokud mrznoucí hráč klikne na *„Mrznu!“*, zapíše se signál do DB. Na o
 
 ---
 
-## 4.4 Úroveň 3: Kód pravdy (Skládání úlomků)
+## 4.4 Úroveň 3: Kód pravdy (Dilema vězně a Brána pravdy)
 
-**Cíl:** Rozvoj pravdomluvnosti, přesnosti a asymetrické spolupráce.
+**Cíl:** Rozvoj pravdomluvnosti, etického rozhodování, rozpoznání následků zrady vs. spolupráce a asymetrické spolupráce.
 
 ### A. Vizuální rozvržení (UI/UX)
-- Zobrazuje se uzamčená kamenná brána s 5 prázdnými sloty pro výsledný kód a digitální klávesnicí na displeji.
+- Zobrazuje se uzamčená kamenná brána s 5 prázdnými sloty pro výsledný kód (runové sloty, které po vyplnění svítí zlatě) a digitální klávesnicí na displeji.
 - Každý hráč vidí v boxu **„Tvůj úlomek“** část kódu, zbytek je nahrazen pomlčkami.
-- Pod ním je tlačítko **„⚡ Odeslat parťákovi“**.
-- V pravém boxu **„Úlomek parťáka“** svítí otazníky `???`, dokud jim parťák svůj úlomek nepošle.
+- Pod ním jsou dvě tlačítka pro volbu sdílení:
+  - `🟢 Odeslat pravdu` – Odešle partnerovi skutečný úlomek.
+  - `🔴 Poslat lež` – Vygeneruje zfalšovaný kód (písmena se náhodně zamění, ale formát pomlček zůstane zachován) a odešle jej.
+- V pravém boxu **„Úlomek parťáka“** svítí otazníky `???`, dokud parťák neprovede sdílení.
 
-### B. Algoritmus sdílení a sestavení kódu
+### B. Algoritmus sdílení, detektor lži a dešifrování
 1. Kód se generuje náhodně z povolených znaků `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 2. Sova vidí fragment složený z prvních dvou znaků (např. `AB---`), Rys vidí fragment s posledními třemi znaky (např. `--CDE`).
-3. Po stisknutí *„Odeslat parťákovi“* se příslušný stav (`sovaShared` / `rysShared`) v DB změní na `true`. Partnerovi se v pravém boxu zobrazí parťákův úlomek.
-4. Hráči musí mentálně spojit oba fragmenty (např. `AB` + `CDE` = `ABCDE`) a naťukat výsledných 5 znaků na klávesnici.
+3. Po stisknutí jednoho z tlačítek se zapíše stav sdílení (`sovaShared` / `rysShared` = `true`), hodnota úlomku (skutečná/falešná) a status pravosti (`sovaShardStatus` / `rysShardStatus` = `'true'` / `'fake'`) do databáze.
+4. Partner po obdržení kódu vidí tlačítko `🔍 Otestovat pravost`. Po kliknutí proběhne 2vteřinová animace skenování.
+5. **Výsledek skenování:**
+   - **Úlomek je pravdivý:** Zobrazí se zelený badge `🟢 Úlomek je pravdivý`.
+   - **Úlomek je falešný!** Zobrazí se červený varovný blikající badge a tlačítko `⚡ Dešifrovat pravdivý kód (15s)`.
+6. **Dešifrování:** Spustí se 15sekundové dešifrování s progress barem. Po dokončení se zobrazí partnerův skutečný fragment, čímž poctivý hráč získá možnost poskládat správný kód i přes partnerovo lhaní.
 
 ### C. Ošetření chyb a limit pokusů
 - Pokud hráč zadá nesprávný kód a odešle jej:
-  - Vstupní pole zabliká červeně.
+  - Vstupní pole zabliká červeně a celá sekce se otřese (`shake` animace).
   - V DB se inkrementuje hodnota `attempts` (pokusy).
 - **Změna kódu:** Limit pokusů je **3**. Pokud je kód zadán 3krát chybně:
-  - Kód se v databázi kompletně změní (vygenerují se nové úlomky).
-  - Oběma hráčům se zobrazí modal **„Kód se změnil!“** vysvětlující, že překročili limit pokusů a musí si poslat nové úlomky.
-  - Tlačítko sdílení se znovu aktivuje.
-  - Hráči se vrátí do hry až po potvrzení tlačítkem *„👍 Rozumím, jdeme na to“*.
+  - Kód se v databázi kompletně resetuje (vygenerují se nové úlomky).
+  - Oběma hráčům se zobrazí modal **„Kód se změnil!“** vysvětlující situaci. Hráči musí znovu odeslat úlomky a provést testování.
+
+### D. Vyhodnocení brány (Útěk a Uvěznění)
+Při odeslání správného kódu brána vyhodnotí status hráče:
+- Pokud hráč **sám poslal pravdu**, brána ho propustí a úspěšně uniká z lesa (`escaped`). Zobrazí se celoobrazovková karta úspěchu se zeleným zářícím tónem a symbolem `✨`.
+- Pokud hráč **poslal lež (podvrh)**, brána jeho zradu odhalí, zablokuje se a uvězní ho v lese (`trapped`). Zobrazí se celoobrazovková karta s mříží, červeným tónem a symbolem `🔒`.
 
 ---
 
 ## 4.5 Modul Post-Game Reflection a Velké odhalení
 
-Po otevření brány v Levelu 3 se spouští závěrečná fáze, která pomáhá uzavřít anonymní zkušenost a přenést ji do reality.
+Po dokončení brány oběma hráči se stav místnosti přepne do reflexe.
 
 ### A. Učitelská kontrola (Čekání)
-Hráči po vstupu do reflexe vidí čekací obrazovku: **„Čekání na učitele, až odemkne fázi reflexe…“**.
-Teprve když učitel v administraci klikne na tlačítko *„Odemknout reflexi“* (čímž přepne `teacherControl/reflectionUnlocked` na `true`), klientské aplikace se automaticky přepnou do dalšího kroku.
+Hráči po vstupu do reflexe vidí čekací obrazovku: **„Čekání na učitele, až odemkne fázi reflexe…“**. (Tento stav je chráněn proti epileptickému problikávání při změnách v databázi).
+Teprve když učitel v administraci klikne na tlačítko *„Odemknout reflexi“*, klientské aplikace se přepnou do fáze odmaskování.
 
 ### B. Krok 1: Statistika a spuštění odmaskování
-1. Zobrazí se statistická karta s informacemi o spolupráci:
-   - Počet pádů do pastí v Levelu 1 (`resetCount`).
-   - Počet neúspěšných pokusů o zadání kódu v Levelu 3 (`attempts`).
+1. Zobrazí se statistická karta s informacemi o spolupráci (počet pádů v L1, počet neúspěšných pokusů v L3).
 2. Hráč vidí, se kterým anonymním zvířetem hrál.
-3. Kliknutím na tlačítko **„🔍 Odhalit skutečné jméno partnera“** hráč potvrdí odmaskování. Tento stav se bezpečně uloží lokálně do `localStorage` (jako `reveal_{pairId}`).
+3. Kliknutím na tlačítko **„🔍 Odhalit skutečné jméno partnera“** se provede 3D otočení karty spolužáka (s podporou 3D paralaxního efektu při pohybu myši) a zasypání obrazovky konfetami.
 
-### C. Krok 2: Aha moment a 3D otočení karty
-1. Klient jednorázově načte identitu partnera z dat uzlu `/rooms/{pairId}/identities` (jméno a avatar).
-2. Spustí se CSS 3D animace otočení karty.
-3. Karta odhalí skutečné jméno spolužáka a jeho avatar s textem:
-   **„[Jméno] byl tvým herním parťákem! Tento hráč ti věřil, i když tě neviděl.“**
+### C. Krok 2: Morální vyhodnocení na základě výsledků
+Na základě kombinace stavů `escapedPlayers` se zobrazí barevný morální banner a na míru šitý citát:
+1. **Společné vítězství (oba `escaped`):** Zelený banner `🟢 Společné vítězství!`. Hráči si věřili a oba unikli. Citát vyzdvihuje sílu důvěry a spolupráce.
+2. **Unikl jsi sám / Byl jsi uvězněn (jeden `escaped`, jeden `trapped`):** 
+   - Pro uprchlíka: Modrý banner `⚡ Unikl jsi sám!`. Partner se pokusil o zradu, ale byl bránou polapen.
+   - Pro zrádce: Oranžový banner `⚠️ Byl jsi uvězněn bránou!`. Pokusil se oklamat partnera a byl potrestán.
+3. **Vzájemná zrada potrestána (oba `trapped`):** Tmavě červený banner `🚨 Vzájemná zrada potrestána!`. Oba se pokusili oklamat druhého, oba zůstali uvězněni. Poukazuje na to, že vzájemná zrada vede k oboustranné porážce.
 
 ### D. Krok 3: Závěrečný real-time chat
-Po odmaskování se přímo pod kartou odemkne chatovací místnost (`#reflection-chat-box` napojená na `rooms/{pairId}/reflectionChat` v RTDB).
-- Chat funguje v reálném čase.
-- **Párové zobrazení zpráv:** Zprávy odeslané aktuálním uživatelem se zobrazují vpravo (fialové bubliny). Zprávy od partnera se zobrazují vlevo (šedé bubliny) a jsou nadepsány partnerovým **skutečným jménem** (např. *Jan Novák*).
-- Zde mohou žáci probrat průběh hry, poděkovat si a sdílet své pocity ze spolupráce.
+Po odmaskování a zobrazení morálních karet se odemkne chatovací místnost.
+- Zprávy se synchronizují v reálném čase.
+- Partnerovy zprávy jsou jasně nadepsány jeho **skutečným jménem** a zobrazeny v odlišném barevném schématu.
+- Slouží k diskuzi o průběhu hry, sdílení pocitů a vysvětlení motivů chování v Levelu 3.

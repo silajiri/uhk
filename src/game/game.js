@@ -41,6 +41,18 @@ export function initGameRouter(db, pairId, role, animal) {
         initLevel1(db, pairId, role);
         break;
       case 'level2':
+        // Před-inicializujeme data pro Level 2 ihned, aby se předešlo race conditions ze starých her
+        if (role === 'player1') {
+          const levelRef = ref(db, `rooms/${pairId}/actions/level2_warmth`);
+          update(levelRef, {
+            crystalHolder: 'player1',
+            'temperatures/player1': 100,
+            'temperatures/player2': 100,
+            startTime: serverTimestamp(),
+            resetCount: 0
+          });
+        }
+
         root.innerHTML = `
           <div class="level-transition-card">
             <div class="success-icon">🌟</div>

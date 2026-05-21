@@ -7,8 +7,9 @@ export function initLevel2(db, pairId, role, animal) {
   // UI Konstrukce
   root.innerHTML = `
     <div id="level2-container">
-      <div class="role-indicator-header" style="text-align: center; margin-bottom: 1.5rem; font-family: 'Fredoka', 'Segoe UI', sans-serif;">
-        <span style="background: var(--primary); color: white; padding: 0.6rem 1.8rem; border-radius: 20px; font-size: 1.15rem; font-weight: bold; box-shadow: var(--shadow); border: 2px solid rgba(255, 255, 255, 0.1); display: inline-block;">
+      <div id="frost-overlay"></div>
+      <div class="role-indicator-header" style="text-align: center; margin-bottom: 0.8rem; font-family: 'Fredoka', 'Segoe UI', sans-serif;">
+        <span style="background: var(--primary); color: white; padding: 0.4rem 1.2rem; border-radius: 20px; font-size: 1rem; font-weight: bold; box-shadow: var(--shadow); border: 2px solid rgba(255, 255, 255, 0.1); display: inline-block;">
           Jsi: ${isSova ? '🦉 SOVA' : '🐾 RYS'}
         </span>
       </div>
@@ -16,16 +17,40 @@ export function initLevel2(db, pairId, role, animal) {
       <div class="warmth-bars">
         <div class="bar-container">
           <label>Teplo Sovy ${isSova ? '<span class="role-ty-badge" style="background: rgba(52, 152, 219, 0.18); color: var(--sova-color, #3498db); padding: 0.2rem 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; border: 1px solid rgba(52, 152, 219, 0.35); margin-left: 0.5rem; display: inline-block; box-shadow: 0 0 10px rgba(52, 152, 219, 0.25);">TY</span>' : ''}</label>
-          <div class="progress-bar"><div id="bar-player1" class="fill" style="width: 100%"></div></div>
+          <div class="progress-bar">
+            <div id="bar-player1" class="fill" style="width: 100%"></div>
+            <div class="progress-bar-bubbles" id="bubbles-player1"></div>
+          </div>
         </div>
         <div class="bar-container">
           <label>Teplo Ryse ${!isSova ? '<span class="role-ty-badge" style="background: rgba(230, 126, 34, 0.18); color: var(--rys-color, #e67e22); padding: 0.2rem 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; border: 1px solid rgba(230, 126, 34, 0.35); margin-left: 0.5rem; display: inline-block; box-shadow: 0 0 10px rgba(230, 126, 34, 0.25);">TY</span>' : ''}</label>
-          <div class="progress-bar"><div id="bar-player2" class="fill" style="width: 100%"></div></div>
+          <div class="progress-bar">
+            <div id="bar-player2" class="fill" style="width: 100%"></div>
+            <div class="progress-bar-bubbles" id="bubbles-player2"></div>
+          </div>
         </div>
       </div>
+      
+      <div class="crystal-scene">
+        <div id="crystal-svg-container" class="crystal-svg-container holder-none">
+          <svg class="crystal-svg" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="50,5 95,45 80,105 50,115 20,105 5,45" fill="rgba(0, 210, 255, 0.45)" stroke="#00d2ff" stroke-width="2.5" />
+            <polygon points="50,5 50,115 80,105 95,45" fill="rgba(0, 210, 255, 0.28)" />
+            <polygon points="50,5 50,115 20,105 5,45" fill="rgba(0, 210, 255, 0.15)" />
+            <line x1="50" y1="5" x2="50" y2="115" stroke="#ffffff" stroke-width="1.5" opacity="0.8" />
+            <line x1="50" y1="5" x2="95" y2="45" stroke="#ffffff" stroke-width="0.5" opacity="0.6" />
+            <line x1="50" y1="5" x2="5" y2="45" stroke="#ffffff" stroke-width="0.5" opacity="0.6" />
+            <circle cx="50" cy="60" r="8" fill="#ffffff" filter="blur(3px)" opacity="0.6" />
+          </svg>
+        </div>
+      </div>
+
       <div id="crystal-status">Načítání krystalu...</div>
       <div id="level2-controls"></div>
-      <div id="timer-display">Přežijte: 120s</div>
+      <div class="timer-weather-wrapper">
+        <div id="timer-display">Přežijte: 120s</div>
+        <div id="weather-status" class="phase-1">❄️ Načítání počasí...</div>
+      </div>
     </div>
   `;
 
@@ -40,7 +65,23 @@ export function initLevel2(db, pairId, role, animal) {
     "Ocitli jste se v mrazivé mlze, která vám postupně ubírá teplo. Uprostřed obrazovky vidíte své teplotní bary.<br><br>" +
     "Pouze držitel krystalu se zahřívá, zatímco druhý hráč mrzne. **Musíte si krystal střídat** klikáním na tlačítko tak, aby nikdo z vás nezmrzl (teplota nesmí klesnout na 0).<br><br>" +
     "Pokud začínáte mrznout, klikněte na tlačítko <em>Mrznu! Potřebuji teplo!</em>, které upozorní vašeho parťáka. Musíte spolu vydržet 120 sekund.";
-  showInstructionsModal(title, text);
+
+  let instructionsDismissed = false;
+  let intervalId = null;
+  let currentTemps = { player1: 100, player2: 100 };
+  let lastKnownResetCount = null;
+  let levelStartTime = null;
+
+  showInstructionsModal(title, text, () => {
+    instructionsDismissed = true;
+    // Spustíme interval na základě aktuálních dat v DB
+    get(levelRef).then((snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        manageWarmthInterval(data.crystalHolder, role, db, pairId);
+      }
+    });
+  });
 
   // Prvotní nastavení (pouze Sova inicializuje level)
   if (isSova) {
@@ -52,10 +93,6 @@ export function initLevel2(db, pairId, role, animal) {
       resetCount: 0
     });
   }
-
-  let intervalId = null;
-  let currentTemps = { player1: 100, player2: 100 };
-  let lastKnownResetCount = null;
 
   // Hlavní listener stavu levelu
   onValue(levelRef, (snapshot) => {
@@ -82,36 +119,52 @@ export function initLevel2(db, pairId, role, animal) {
       bar2.style.boxShadow = `0 0 20px ${color2.replace('rgb', 'rgba').replace(')', ', 0.5)')}`;
       
       const myTemp = isSova ? t1 : t2;
+      const frostOverlay = document.getElementById('frost-overlay');
+      if (frostOverlay) {
+        if (myTemp < 30) {
+          frostOverlay.classList.add('active');
+          const targetOpacity = Math.max(0.3, (30 - myTemp) / 30);
+          frostOverlay.style.opacity = targetOpacity;
+        } else {
+          frostOverlay.classList.remove('active');
+          frostOverlay.style.opacity = 0;
+        }
+      }
       document.getElementById('game-root').classList.toggle('low-warmth', myTemp < 30);
     }
 
     // 2. Výpočet času přežití
     if (data.startTime) {
-      const elapsed = Math.floor((Date.now() - data.startTime) / 1000);
+      levelStartTime = data.startTime;
+      const elapsed = Math.floor((Date.now() - levelStartTime) / 1000);
       timerEl.textContent = `Přežijte: ${Math.max(0, 120 - elapsed)}s`;
       
-      if (elapsed >= 120 && isSova) {
+      updateWeatherUI(elapsed);
+      
+      if (elapsed >= 120 && isSova && instructionsDismissed) {
         handleSuccess(db, pairId);
       }
     }
 
     // 3. Detekce resetu hry přes resetCount
     if (data.resetCount !== undefined) {
-      if (lastKnownResetCount !== null && data.resetCount > lastKnownResetCount) {
+      if (instructionsDismissed && lastKnownResetCount !== null && data.resetCount > lastKnownResetCount) {
         showResetOverlay();
       }
       lastKnownResetCount = data.resetCount;
     }
 
     // 4. Zpracování nouzových signálů
-    if (data.signal && role === data.crystalHolder) {
+    if (data.signal && role === data.crystalHolder && instructionsDismissed) {
       flashSignal();
       set(ref(db, `rooms/${pairId}/actions/level2_warmth/signal`), null);
     }
 
     // 5. Správa ovládacích prvků a časovače mrazu
     updateHolderUI(data.crystalHolder, role, controlsEl, crystalStatusEl, levelRef, db, pairId);
-    manageWarmthInterval(data.crystalHolder, role, db, pairId);
+    if (instructionsDismissed) {
+      manageWarmthInterval(data.crystalHolder, role, db, pairId);
+    }
   });
 
   function manageWarmthInterval(holder, myRole, db, pairId) {
@@ -123,12 +176,19 @@ export function initLevel2(db, pairId, role, animal) {
         let t1 = currentTemps.player1;
         let t2 = currentTemps.player2;
 
+        let elapsed = 0;
+        if (levelStartTime) {
+          elapsed = Math.floor((Date.now() - levelStartTime) / 1000);
+        }
+        
+        const rates = getWarmthRates(elapsed);
+
         if (myRole === 'player1') {
-          t1 = Math.min(100, t1 + 2);
-          t2 = Math.max(0, t2 - 4);
+          t1 = Math.min(100, t1 + rates.gain);
+          t2 = Math.max(0, t2 - rates.loss);
         } else {
-          t2 = Math.min(100, t2 + 2);
-          t1 = Math.max(0, t1 - 4);
+          t2 = Math.min(100, t2 + rates.gain);
+          t1 = Math.max(0, t1 - rates.loss);
         }
 
         if (t1 <= 0 || t2 <= 0) {
@@ -150,6 +210,28 @@ function updateHolderUI(holder, role, controlsEl, statusEl, levelRef, db, pairId
   statusEl.textContent = amIHolder ? "💎 DRŽÍŠ KRYSTAL" : "❄️ MRZNEŠ";
   statusEl.className = amIHolder ? "holder" : "freezing";
 
+  // Posuneme krystal na stranu držitele
+  const crystalContainer = document.getElementById('crystal-svg-container');
+  if (crystalContainer) {
+    crystalContainer.className = `crystal-svg-container holder-${holder}`;
+  }
+
+  // Spustíme bublinky pro ohřívajícího se hráče
+  const bubbles1 = document.getElementById('bubbles-player1');
+  const bubbles2 = document.getElementById('bubbles-player2');
+  if (bubbles1 && bubbles2) {
+    if (holder === 'player1') {
+      if (!bubbles1.children.length) setupBubbles(bubbles1);
+      bubbles2.innerHTML = '';
+    } else if (holder === 'player2') {
+      if (!bubbles2.children.length) setupBubbles(bubbles2);
+      bubbles1.innerHTML = '';
+    } else {
+      bubbles1.innerHTML = '';
+      bubbles2.innerHTML = '';
+    }
+  }
+
   controlsEl.innerHTML = '';
   if (amIHolder) {
     const btn = document.createElement('button');
@@ -163,6 +245,18 @@ function updateHolderUI(holder, role, controlsEl, statusEl, levelRef, db, pairId
     btn.textContent = '🥶 Mrznu! Potřebuji teplo!';
     btn.onclick = () => set(ref(db, `rooms/${pairId}/actions/level2_warmth/signal`), 'FREEZING');
     controlsEl.appendChild(btn);
+  }
+}
+
+function setupBubbles(container) {
+  container.innerHTML = '';
+  for (let i = 0; i < 6; i++) {
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.style.left = `${Math.random() * 100}%`;
+    bubble.style.animationDelay = `${Math.random() * 1.5}s`;
+    bubble.style.animationDuration = `${1.2 + Math.random() * 0.8}s`;
+    container.appendChild(bubble);
   }
 }
 
@@ -239,7 +333,7 @@ function handleFailure(db, pairId) {
   });
 }
 
-function showInstructionsModal(title, text) {
+function showInstructionsModal(title, text, onDismiss) {
   const old = document.getElementById('instructions-modal');
   if (old) return;
 
@@ -276,6 +370,7 @@ function showInstructionsModal(title, text) {
   if (btn) {
     btn.onclick = () => {
       overlay.remove();
+      if (onDismiss) onDismiss();
     };
   }
 }
@@ -362,5 +457,35 @@ function getWarmthColor(percent) {
     const g = Math.round(152 + (204 - 152) * ratio);
     const b = Math.round(219 + (113 - 219) * ratio);
     return `rgb(${r}, ${g}, ${b})`;
+  }
+}
+
+function updateWeatherUI(elapsed) {
+  const weatherStatusEl = document.getElementById('weather-status');
+  const timerEl = document.getElementById('timer-display');
+  if (!weatherStatusEl || !timerEl) return;
+
+  if (elapsed < 40) {
+    weatherStatusEl.textContent = '❄️ Mírný chlad (teplo ubývá pomalu)';
+    weatherStatusEl.className = 'phase-1';
+    timerEl.classList.remove('timer-blizzard');
+  } else if (elapsed < 80) {
+    weatherStatusEl.textContent = '💨 Silný mráz (teplo ubývá rychleji!)';
+    weatherStatusEl.className = 'phase-2';
+    timerEl.classList.remove('timer-blizzard');
+  } else {
+    weatherStatusEl.textContent = '🚨 BLIZZARD! (Rychle si střídejte krystal!)';
+    weatherStatusEl.className = 'phase-3';
+    timerEl.classList.add('timer-blizzard');
+  }
+}
+
+function getWarmthRates(elapsed) {
+  if (elapsed < 40) {
+    return { loss: 2, gain: 4 };
+  } else if (elapsed < 80) {
+    return { loss: 4, gain: 4 };
+  } else {
+    return { loss: 7, gain: 5 };
   }
 }

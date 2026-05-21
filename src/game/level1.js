@@ -9,8 +9,8 @@ export function initLevel1(db, pairId, role) {
   const gameRoot = document.getElementById('game-root');
   gameRoot.innerHTML = `
     <div id="level1-container" class="${isSova ? 'sova-view' : 'rys-view'}">
-      <div class="role-indicator-header" style="text-align: center; margin-bottom: 1.5rem; font-family: 'Fredoka', 'Segoe UI', sans-serif;">
-        <span style="background: var(--primary); color: white; padding: 0.6rem 1.8rem; border-radius: 20px; font-size: 1.15rem; font-weight: bold; box-shadow: var(--shadow); border: 2px solid rgba(255, 255, 255, 0.1); display: inline-block;">
+      <div class="role-indicator-header" style="text-align: center; margin-bottom: 0.8rem; font-family: 'Fredoka', 'Segoe UI', sans-serif;">
+        <span style="background: var(--primary); color: white; padding: 0.4rem 1.2rem; border-radius: 20px; font-size: 1rem; font-weight: bold; box-shadow: var(--shadow); border: 2px solid rgba(255, 255, 255, 0.1); display: inline-block;">
           Jsi: ${isSova ? '🦉 SOVA (Navigátor)' : '🐾 RYS (Poutník)'}
         </span>
       </div>
@@ -36,18 +36,18 @@ export function initLevel1(db, pairId, role) {
 
   if (isSova) {
     controlsEl.innerHTML = `
-      <div class="navigation-pad" style="display: flex; flex-direction: column; align-items: center; gap: 1.5rem; margin-top: 1.5rem;">
-        <div class="nav-grid" style="display: grid; grid-template-columns: repeat(3, 75px); grid-template-rows: repeat(2, 75px); gap: 10px; justify-content: center;">
+      <div class="navigation-pad" style="margin-top: 0.8rem; padding: 1rem;">
+        <div class="nav-grid" style="display: grid; grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(2, 60px); gap: 8px; justify-content: center; margin-bottom: 0.8rem;">
           <div></div>
-          <button class="btn-nav" id="btn-sig-UP" style="width: 75px; height: 75px; font-size: 1.8rem; font-weight: bold; border-radius: 18px; border: 2px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); transition: transform 0.1s;">↑</button>
+          <button class="btn-nav" id="btn-sig-UP">↑</button>
           <div></div>
-          <button class="btn-nav" id="btn-sig-LEFT" style="width: 75px; height: 75px; font-size: 1.8rem; font-weight: bold; border-radius: 18px; border: 2px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); transition: transform 0.1s;">←</button>
-          <button class="btn-nav" id="btn-sig-DOWN" style="width: 75px; height: 75px; font-size: 1.8rem; font-weight: bold; border-radius: 18px; border: 2px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); transition: transform 0.1s;">↓</button>
-          <button class="btn-nav" id="btn-sig-RIGHT" style="width: 75px; height: 75px; font-size: 1.8rem; font-weight: bold; border-radius: 18px; border: 2px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); transition: transform 0.1s;">→</button>
+          <button class="btn-nav" id="btn-sig-LEFT">←</button>
+          <button class="btn-nav" id="btn-sig-DOWN">↓</button>
+          <button class="btn-nav" id="btn-sig-RIGHT">→</button>
         </div>
-        <div class="action-buttons" style="display: flex; gap: 12px; width: 100%; max-width: 250px;">
-          <button class="btn-action" id="btn-sig-STOP" style="flex: 1; padding: 0.9rem; font-weight: 700; border-radius: 12px; cursor: pointer; background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 2px solid #e74c3c; transition: all 0.2s;">🛑 STOP!</button>
-          <button class="btn-action" id="btn-sig-TRAP" style="flex: 1; padding: 0.9rem; font-weight: 700; border-radius: 12px; cursor: pointer; background: rgba(241, 196, 15, 0.15); color: #f1c40f; border: 2px solid #f1c40f; transition: all 0.2s;">⚠️ PAST</button>
+        <div class="action-buttons" style="display: flex; gap: 12px; width: 100%; max-width: 250px; margin: 0 auto;">
+          <button class="btn-action" id="btn-sig-STOP" style="flex: 1; padding: 0.6rem; font-weight: 700; border-radius: 12px; cursor: pointer; background: rgba(231, 76, 60, 0.15); color: #e74c3c; border: 2px solid #e74c3c; transition: all 0.2s;">🛑 STOP!</button>
+          <button class="btn-action" id="btn-sig-TRAP" style="flex: 1; padding: 0.6rem; font-weight: 700; border-radius: 12px; cursor: pointer; background: rgba(241, 196, 15, 0.15); color: #f1c40f; border: 2px solid #f1c40f; transition: all 0.2s;">⚠️ PAST</button>
         </div>
       </div>
     `;
@@ -89,9 +89,12 @@ export function initLevel1(db, pairId, role) {
   onValue(levelRef, (snapshot) => {
     const data = snapshot.val();
     
-    if (!data || !data.map) {
+    const hasInvalidPath = data && data.map && data.startPos && data.goalPos &&
+      !hasPathBFS(data.map, data.startPos.x, data.startPos.y, data.goalPos.x, data.goalPos.y);
+
+    if (!data || !data.map || hasInvalidPath) {
       if (isSova) {
-        console.log("Generuji novou náhodnou mapu lesa...");
+        console.log("Detekována neplatná nebo neprůchodná mapa. Generuji novou...");
         const levelData = generateLevel1Data();
         update(levelRef, {
           map: levelData.map,
@@ -131,7 +134,7 @@ export function initLevel1(db, pairId, role) {
             if (type === 2) cell.classList.add('trap');
             if (x === goalPos.x && y === goalPos.y) cell.classList.add('goal');
           } else {
-            // Rys vidí cíl až když na něj stoupne (asymetrická hra, navigátor ho musí navádět naslepo)
+            // Rys je v absolutní tmě, nevidí zdi ani pasti kolem sebe
           }
           
           if (currentPos.x === x && currentPos.y === y) {
@@ -273,7 +276,7 @@ function hasPathBFS(map, sx, sy, gx, gy) {
       const ny = y + dy[i];
 
       if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-        if (!visited[ny][nx] && map[ny][nx] !== 1) { // 1 = zeď
+        if (!visited[ny][nx] && map[ny][nx] === 0) { // 0 = volná cesta (bez zdí i pastí)
           visited[ny][nx] = true;
           queue.push([nx, ny]);
         }

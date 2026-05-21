@@ -28,24 +28,27 @@ export function initReflection(db, pairId, role, animal) {
     const unlocked = room.teacherControl?.reflectionUnlocked || false;
 
     if (!unlocked) {
-      // Zobrazení čekací obrazovky
-      root.innerHTML = `
-        <div class="level-transition-card waiting-reflection">
-          <div class="success-icon">✨</div>
-          <h1>Skvělá práce!</h1>
-          <p>Společně jste dokončili všechny herní úrovně a přečkali nástrahy mlžného lesa.</p>
-          <div class="spinner-row" style="margin-top: 2rem;">
-            <div class="spinner"></div>
-            <span>Čekání na učitele, až odemkne fázi reflexe…</span>
+      // Zobrazení čekací obrazovky pouze pokud ještě není zobrazená (zabraňuje nepříjemnému blikání)
+      if (!root.querySelector('.waiting-reflection')) {
+        root.innerHTML = `
+          <div class="level-transition-card waiting-reflection">
+            <div class="success-icon">✨</div>
+            <h1>Skvělá práce!</h1>
+            <p>Společně jste dokončili všechny herní úrovně a přečkali nástrahy mlžného lesa.</p>
+            <div class="spinner-row" style="margin-top: 2rem;">
+              <div class="spinner"></div>
+              <span>Čekání na učitele, až odemkne fázi reflexe…</span>
+            </div>
           </div>
-        </div>
-      `;
+        `;
+      }
       return;
     }
 
     // Načtení statistik a identit
     const level1Resets = room.actions?.level1_darkness?.resetCount || 0;
     const level3Attempts = room.actions?.level3_truth?.attempts || 0;
+    const escapedPlayers = room.actions?.level3_truth?.escapedPlayers || { player1: 'waiting', player2: 'waiting' };
 
     const partnerIdentity = room.identities?.[partnerPath] || { name: 'Tvůj parťák', avatar: 'default.svg' };
     const partnerAnimal = role === 'player1' ? (room.players?.animal2?.animal || 'Rys') : (room.players?.animal1?.animal || 'Sova');
@@ -54,19 +57,44 @@ export function initReflection(db, pairId, role, animal) {
     const isRevealed = localStorage.getItem(`reveal_${pairId}`) === 'true';
 
     if (!isRevealed) {
-      renderRevealScreen(root, partnerAnimal, level1Resets, level3Attempts, partnerIdentity, pairId);
+      if (!root.querySelector('.reflection-reveal-card')) {
+        renderRevealScreen(root, partnerAnimal, level1Resets, level3Attempts, partnerIdentity, pairId);
+      } else {
+        // Pouze aktualizujeme detaily, které mohly dorazit později (např. jméno partnera)
+        const imgEl = root.querySelector('.reflection-card-back img');
+        if (imgEl) {
+          const newSrc = `assets/avatars/${partnerIdentity.avatar || 'default.svg'}`;
+          if (!imgEl.src.includes(newSrc)) {
+            imgEl.src = newSrc;
+          }
+        }
+        const nameEl = root.querySelector('#revealed-name-display h2');
+        if (nameEl && nameEl.textContent !== partnerIdentity.name) {
+          nameEl.textContent = partnerIdentity.name;
+        }
+      }
     } else {
       const avatarPath = `assets/avatars/${partnerIdentity.avatar || 'default.svg'}`;
       let finalCard = document.getElementById('reflection-final-card');
       if (!finalCard) {
-        renderReflectionScreenOuter(root, partnerIdentity, avatarPath);
+        renderReflectionScreenOuter(root, partnerIdentity, avatarPath, escapedPlayers, role);
       }
-      renderChatMessages(db, pairId, role, room.reflectionChat, partnerIdentity);
+      
+      const chatBox = document.getElementById('reflection-chat-box');
+      if (chatBox) {
+        const currentChatJson = JSON.stringify(room.reflectionChat || {});
+        if (chatBox.dataset.lastJson !== currentChatJson) {
+          chatBox.dataset.lastJson = currentChatJson;
+          renderChatMessages(db, pairId, role, room.reflectionChat, partnerIdentity);
+        }
+      }
     }
   });
 }
 
 function renderRevealScreen(root, partnerAnimal, resets, attempts, partnerIdentity, pairId) {
+  const avatarPath = `assets/avatars/${partnerIdentity.avatar || 'default.svg'}`;
+  
   root.innerHTML = `
     <div class="module-card reflection-reveal-card" style="max-width: 650px; text-align: center; animation: fadeIn 0.5s;">
       <div class="module-tag">Fáze: Odhalení</div>
@@ -86,9 +114,25 @@ function renderRevealScreen(root, partnerAnimal, resets, attempts, partnerIdenti
         </div>
       </div>
 
-      <p class="module-description" style="font-size: 1.1rem; margin-top: 2rem;">
+      <p class="module-description" style="font-size: 1.1rem; margin-top: 1.5rem;">
         Tvým partnerem ve hře byl anonymní <strong>${partnerAnimal}</strong>.
       </p>
+
+      <div class="reflection-card-wrap">
+        <div id="reflection-card" class="reflection-card-inner">
+          <div class="reflection-card-front">
+            <div style="font-size: 3.5rem;">❓</div>
+          </div>
+          <div class="reflection-card-back">
+            <img src="${avatarPath}" alt="Avatar partnera" onerror="this.src='assets/avatars/default.svg'">
+          </div>
+        </div>
+      </div>
+
+      <div id="revealed-name-display" style="opacity: 0; height: 0; overflow: hidden; transition: all 0.5s ease; margin-top: 0.5rem;">
+        <h2 style="margin: 0; font-size: 1.8rem; color: #2ecc71;">${partnerIdentity.name}</h2>
+        <p style="color: var(--muted); margin: 0 0 1rem 0;">byl tvým herním parťákem!</p>
+      </div>
 
       <button id="btn-reveal-identity" class="btn-crystal" style="margin-top: 1.5rem; padding: 1.2rem 2.5rem; font-size: 1.2rem; cursor: pointer; width: 100%;">
         🔍 Odhalit skutečné jméno partnera
@@ -96,20 +140,148 @@ function renderRevealScreen(root, partnerAnimal, resets, attempts, partnerIdenti
     </div>
   `;
 
-  document.getElementById('btn-reveal-identity').onclick = () => {
-    const card = root.querySelector('.reflection-reveal-card');
-    card.style.transform = 'scale(0.95)';
-    card.style.opacity = '0';
-    card.style.transition = 'all 0.5s ease';
+  const cardWrap = root.querySelector('.reflection-card-wrap');
+  const cardInner = root.querySelector('#reflection-card');
+  const revealBtn = root.querySelector('#btn-reveal-identity');
+  const nameDisplay = root.querySelector('#revealed-name-display');
+
+  // Parallax tilt efekt na myš
+  if (cardWrap && cardInner) {
+    cardWrap.onmousemove = (e) => {
+      const rect = cardWrap.getBoundingClientRect();
+      const x = e.clientX - rect.left - rect.width / 2;
+      const y = e.clientY - rect.top - rect.height / 2;
+      
+      const rotX = -(y / (rect.height / 2)) * 15;
+      const rotY = (x / (rect.width / 2)) * 15;
+      
+      const isFlipped = cardInner.classList.contains('flipped');
+      cardInner.style.transform = `rotateX(${rotX}deg) rotateY(${isFlipped ? 180 + rotY : rotY}deg)`;
+    };
     
-    setTimeout(() => {
-      localStorage.setItem(`reveal_${pairId}`, 'true');
-      document.dispatchEvent(new CustomEvent('uhk-reveal-done'));
-    }, 500);
+    cardWrap.onmouseleave = () => {
+      const isFlipped = cardInner.classList.contains('flipped');
+      cardInner.style.transform = isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
+    };
+  }
+
+  let step = 0; // 0 = neotočeno, 1 = otočeno a zobrazeno jméno
+  revealBtn.onclick = () => {
+    if (step === 0) {
+      step = 1;
+      
+      // 3D Otočení a záblesk
+      cardInner.classList.add('flipped');
+      cardInner.classList.add('card-flash');
+      
+      // Zobrazení jména
+      nameDisplay.style.height = 'auto';
+      nameDisplay.style.opacity = '1';
+      
+      // Konfety
+      spawnConfetti();
+      
+      revealBtn.innerHTML = '👍 Pokračovat k chatu a hodnocení';
+      revealBtn.style.background = 'linear-gradient(135deg, #2ecc71, #27ae60)';
+      revealBtn.style.borderColor = '#2ecc71';
+    } else {
+      const card = root.querySelector('.reflection-reveal-card');
+      card.style.transform = 'scale(0.95)';
+      card.style.opacity = '0';
+      card.style.transition = 'all 0.5s ease';
+      
+      setTimeout(() => {
+        localStorage.setItem(`reveal_${pairId}`, 'true');
+        document.dispatchEvent(new CustomEvent('uhk-reveal-done'));
+      }, 500);
+    }
   };
 }
 
-function renderReflectionScreenOuter(root, partnerIdentity, avatarPath) {
+function spawnConfetti() {
+  const colors = ['#f1c40f', '#2ecc71', '#3498db', '#e74c3c', '#9b59b6', '#e67e22'];
+  for (let i = 0; i < 40; i++) {
+    const particle = document.createElement('div');
+    particle.style.cssText = `
+      position: fixed;
+      top: -10px;
+      left: ${Math.random() * 100}vw;
+      width: ${Math.random() * 8 + 6}px;
+      height: ${Math.random() * 8 + 6}px;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      border-radius: ${Math.random() > 0.5 ? '50%' : '0%'};
+      opacity: ${Math.random() * 0.6 + 0.4};
+      z-index: 10005;
+      pointer-events: none;
+      transform: rotate(${Math.random() * 360}deg);
+      transition: transform 2.5s ease-out, top 2.5s ease-in, opacity 2.5s ease-out;
+    `;
+    document.body.appendChild(particle);
+    
+    setTimeout(() => {
+      particle.style.top = '105vh';
+      particle.style.transform = `translate(${Math.random() * 160 - 80}px, 0) rotate(${Math.random() * 720}deg)`;
+      particle.style.opacity = '0';
+    }, 50);
+    
+    setTimeout(() => particle.remove(), 2550);
+  }
+}
+
+function renderReflectionScreenOuter(root, partnerIdentity, avatarPath, escapedPlayers, role) {
+  const myStatus = role === 'player1' ? escapedPlayers.player1 : escapedPlayers.player2;
+  const partnerStatus = role === 'player1' ? escapedPlayers.player2 : escapedPlayers.player1;
+
+  let outcomeTitle = "";
+  let outcomeText = "";
+  let bannerBg = "";
+  let bannerBorder = "";
+  let bannerColor = "";
+  let bannerIcon = "";
+  let dynamicQuote = "";
+
+  if (myStatus === 'escaped' && partnerStatus === 'escaped') {
+    outcomeTitle = "Společné vítězství!";
+    outcomeText = "Projevili jste vzájemnou důvěru a nezištně sdíleli pravdu. Brána vás propustila oba naráz.";
+    bannerBg = "rgba(46, 204, 113, 0.1)";
+    bannerBorder = "1px solid #2ecc71";
+    bannerColor = "#2ecc71";
+    bannerIcon = "🟢";
+    dynamicQuote = "<strong>„Důvěra je klíčem k přežití.“</strong> Společnými silami jste se navigovali v absolutní tmě, střídali si hřejivý krystal a nakonec poskládali a sdíleli Kód pravdy. Děkujeme, že jste ukázali, že spolupráce a důvěra dokáží rozehnat jakoukoliv mlhu!";
+  } else if (myStatus === 'escaped' && partnerStatus === 'trapped') {
+    outcomeTitle = "Unikl jsi sám!";
+    outcomeText = "Tvůj partner tě zkusil oklamat a poslal ti falešný úlomek. Starobylá brána však jeho lež odhalila a zablokovala ho. Ty jsi díky své upřímnosti prošel.";
+    bannerBg = "rgba(52, 152, 219, 0.1)";
+    bannerBorder = "1px solid #3498db";
+    bannerColor = "#3498db";
+    bannerIcon = "⚡";
+    dynamicQuote = "<strong>„Pravda vítězí.“</strong> Společnými silami jste se sice navigovali tmou, ale u brány se tvůj parťák pokusil o zradu. Tvůj čestný přístup tě zachránil, zatímco les si zrádce ponechal. Reflexe je správný čas popovídat si o tom, proč k tomu došlo.";
+  } else if (myStatus === 'trapped' && partnerStatus === 'escaped') {
+    outcomeTitle = "Byl jsi uvězněn bránou!";
+    outcomeText = "Pokusil ses partnera oklamat zasláním falešného kódu. Brána detekovala tvůj podvrh a potrestala tě. Tvůj poctivý partner úspěšně unikl.";
+    bannerBg = "rgba(230, 126, 34, 0.1)";
+    bannerBorder = "1px solid #e67e22";
+    bannerColor = "#e67e22";
+    bannerIcon = "⚠️";
+    dynamicQuote = "<strong>„Každý čin má své následky.“</strong> Navigovali jste se tmou, ale na konci ses pokusil parťáka oklamat a poslal jsi mu falešný úlomek. Brána tvůj podvod prohlédla a uvěznila tě, zatímco tvůj poctivý partner unikl. Popište si v chatu, proč ses tak rozhodl.";
+  } else if (myStatus === 'trapped' && partnerStatus === 'trapped') {
+    outcomeTitle = "Vzájemná zrada potrestána!";
+    outcomeText = "Oba jste se pokusili oklamat toho druhého. Brána detekovala oboustranný podvrh a uzavřela vás oba navždy v chladném lese.";
+    bannerBg = "rgba(231, 76, 60, 0.15)";
+    bannerBorder = "1px solid #e74c3c";
+    bannerColor = "#e74c3c";
+    bannerIcon = "🚨";
+    dynamicQuote = "<strong>„Kdo jinému jámu kopá...“</strong> Oba jste se pokusili oklamat toho druhého. Důsledkem je, že jste oba zůstali uvězněni v lese. Vzájemná zrada vedla k oboustranné porážce. Napište si, jaké pocity to ve vás vyvolává.";
+  } else {
+    outcomeTitle = "Konec hry";
+    outcomeText = "Prošli jste starobylou bránou.";
+    bannerBg = "rgba(255, 255, 255, 0.05)";
+    bannerBorder = "1px solid var(--border)";
+    bannerColor = "var(--text)";
+    bannerIcon = "✨";
+    dynamicQuote = "Společnými silami jste se navigovali v absolutní tmě, střídali si hřejivý krystal a nakonec poskládali a sdíleli kód.";
+  }
+
   root.innerHTML = `
     <div class="module-card reflection-final-card" id="reflection-final-card" style="max-width: 650px; text-align: center; animation: fadeIn 0.5s;">
       <div class="module-tag" style="background: rgba(46, 204, 113, 0.15); color: #2ecc71;">Fáze: Zpětný pohled</div>
@@ -122,9 +294,19 @@ function renderReflectionScreenOuter(root, partnerIdentity, avatarPath) {
         <p style="color: #2ecc71; font-weight: 700; margin: 0; font-size: 1.1rem;">byl tvým herním parťákem!</p>
       </div>
 
-      <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 20px; padding: 1.2rem; margin-bottom: 1.5rem; text-align: left;">
+      <!-- Morální vyhodnocení brány -->
+      <div style="background: ${bannerBg}; border: ${bannerBorder}; color: ${bannerColor}; border-radius: 16px; padding: 1.2rem; margin-bottom: 1.5rem; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+        <h3 style="margin: 0 0 0.5rem 0; font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; color: ${bannerColor};">
+          <span>${bannerIcon}</span> ${outcomeTitle}
+        </h3>
         <p style="margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text);">
-          <strong>„Tento hráč ti věřil, i když tě neviděl.“</strong> Společnými silami jste se navigovali v absolutní tmě, střídali si hřejivý krystal a nakonec poskládali a sdíleli Kód pravdy. Děkujeme, že jste ukázali, že spolupráce a důvěra dokáží rozehnat jakoukoliv mlhu!
+          ${outcomeText}
+        </p>
+      </div>
+
+      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 20px; padding: 1.2rem; margin-bottom: 1.5rem; text-align: left;">
+        <p style="margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text);">
+          ${dynamicQuote}
         </p>
       </div>
 
@@ -142,11 +324,10 @@ function renderReflectionScreenOuter(root, partnerIdentity, avatarPath) {
       </div>
       
       <div style="margin-top: 2rem; font-size: 0.82rem; color: var(--muted);">
-        Strážci světla © 2026 – Hra pro rozvoj třídního kolektivu
+        Únik z Mlžného lesa © 2026 – Hra pro rozvoj třídního kolektivu
       </div>
     </div>
-  `;
-}
+  `;}
 
 function renderChatMessages(db, pairId, role, chatData, partnerIdentity) {
   const chatBox = document.getElementById('reflection-chat-box');

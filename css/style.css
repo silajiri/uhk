@@ -1,9 +1,10 @@
 :root {
   --bg: #070b1d;
-  --surface: rgba(18, 28, 59, 0.92);
-  --surface-alt: rgba(28, 39, 81, 0.95);
-  --card: #101a3c;
-  --border: rgba(115, 105, 255, 0.16);
+  --bg-main: radial-gradient(circle at 50% 50%, #16152b 0%, #070b1d 100%);
+  --surface: rgba(18, 28, 59, 0.65);
+  --surface-alt: rgba(28, 39, 81, 0.75);
+  --card: rgba(16, 26, 60, 0.6);
+  --border: rgba(115, 105, 255, 0.25);
   --text: #eef1ff;
   --muted: #9ba7ff;
   --accent: #7f6bff;
@@ -11,9 +12,17 @@
   --primary: #6752ff;
   --primary-soft: #8373ff;
   --sova-color: #3498db;
+  --sova-glow: 0 0 20px rgba(52, 152, 219, 0.6);
   --rys-color: #e67e22;
+  --rys-glow: 0 0 20px rgba(230, 126, 34, 0.6);
   --glow: 0 0 40px rgba(127, 107, 255, 0.28);
-  --shadow: 0 24px 80px rgba(0, 0, 0, 0.24);
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+  
+  /* Glassmorphism */
+  --glass-bg: rgba(20, 24, 54, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-blur: blur(16px);
+  --glass-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -163,37 +172,37 @@ h1 {
 .game-page {
   width: min(1180px, 100%);
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 0.8rem 1rem;
 }
 
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  padding: 1.1rem 1.4rem;
+  gap: 0.8rem;
+  padding: 0.55rem 1.2rem;
   background: rgba(18, 27, 60, 0.92);
   border: 1px solid rgba(127, 107, 255, 0.2);
-  border-radius: 24px;
+  border-radius: 16px;
   box-shadow: var(--shadow);
   backdrop-filter: blur(12px);
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.8rem;
 }
 
 .topbar-left {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.8rem;
 }
 
 .player-badge {
-  width: 54px;
-  height: 54px;
+  width: 42px;
+  height: 42px;
   flex-shrink: 0;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 1.8rem;
+  font-size: 1.4rem;
   background: linear-gradient(135deg, rgba(127, 107, 255, 0.2), rgba(90, 143, 255, 0.18));
   border: 1px solid rgba(115, 105, 255, 0.24);
   overflow: hidden;
@@ -403,7 +412,7 @@ h1 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
+  gap: 1rem;
   width: 100%;
   max-width: 600px;
   position: relative;
@@ -432,8 +441,8 @@ h1 {
   grid-template-columns: repeat(10, 1fr);
   grid-template-rows: repeat(10, 1fr);
   gap: 2px;
-  width: min(90vw, 500px);
-  height: min(90vw, 500px);
+  width: min(90vw, 400px);
+  height: min(90vw, 400px);
   background: #1a1a2e;
   border: 4px solid var(--accent-soft);
   border-radius: 12px;
@@ -460,17 +469,29 @@ h1 {
   box-shadow: 0 0 15px #2ecc71;
 }
 
-/* Pohled Ryse - vidí jen tmu (zdi jsou černé, pasti neviditelné) */
-.rys-view .cell { background: #050505; }
-.rys-view .cell.wall { background: #000; }
+/* Pohled Ryse - vidí jen absolutní tmu */
+.rys-view .cell {
+  background: #000000 !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.rys-view #game-grid {
+  background: #000000 !important;
+  border: 2px solid #000000 !important;
+  box-shadow: none !important;
+}
 
 /* Společné: Hráč */
-.player-node {
-  background: #fff !important;
-  box-shadow: 0 0 20px #fff, 0 0 40px var(--accent);
-  border-radius: 50%;
-  transform: scale(0.8);
-  z-index: 10;
+.player-node,
+#game-grid .cell.player-node,
+.rys-view #game-grid .cell.player-node,
+.sova-view .cell.player-node {
+  background: #ffffff !important;
+  box-shadow: 0 0 20px #ffffff, 0 0 40px var(--accent) !important;
+  border-radius: 50% !important;
+  transform: scale(0.8) !important;
+  z-index: 10 !important;
 }
 
 /* Signální overlay pro Ryse */
@@ -561,7 +582,7 @@ h1 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1.2rem;
   width: 100%;
   max-width: 600px;
 }
@@ -626,7 +647,7 @@ h1 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
+  gap: 1.2rem;
   width: 100%;
   max-width: 500px;
 }
@@ -705,6 +726,65 @@ h1 {
   font-size: 1.2rem;
   font-weight: 700;
   color: var(--muted);
+  display: inline-block;
+  transition: all 0.3s ease;
+}
+
+.timer-weather-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  width: 100%;
+}
+
+#weather-status {
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 0.6rem 1.4rem;
+  border-radius: 12px;
+  text-align: center;
+  transition: all 0.5s ease;
+  font-family: 'Fredoka', 'Segoe UI', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+#weather-status.phase-1 {
+  color: #00d2ff;
+  background: rgba(0, 210, 255, 0.08);
+  border: 1px solid rgba(0, 210, 255, 0.3);
+  box-shadow: 0 0 15px rgba(0, 210, 255, 0.15);
+}
+
+#weather-status.phase-2 {
+  color: #f1c40f;
+  background: rgba(241, 196, 15, 0.08);
+  border: 1px solid rgba(241, 196, 15, 0.3);
+  box-shadow: 0 0 15px rgba(241, 196, 15, 0.15);
+}
+
+#weather-status.phase-3 {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.12);
+  border: 1px solid rgba(231, 76, 60, 0.4);
+  box-shadow: 0 0 25px rgba(231, 76, 60, 0.3);
+}
+
+#timer-display.timer-blizzard {
+  color: #ff4757 !important;
+  font-size: 1.55rem !important;
+  text-shadow: 0 0 10px rgba(255, 71, 87, 0.6), 0 0 20px rgba(255, 71, 87, 0.3);
+  animation: timerPulse 0.6s infinite alternate ease-in-out;
+}
+
+@keyframes timerPulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.1);
+  }
 }
 
 .flash-blue {
@@ -767,3 +847,472 @@ h1 {
 .trap-active {
   animation: trap-flash 0.5s ease 3;
 }
+
+/* ==========================================================================
+   GRAFICKÉ VYLEPŠENÍ – NOVÉ STYLY A ANIMACE
+   ========================================================================== */
+
+/* Globální Glassmorphic karty a modály */
+.module-card, .level-transition-card, #instructions-modal > div, #collision-modal > div, #code-reset-modal > div {
+  background: var(--glass-bg) !important;
+  border: 1px solid rgba(127, 107, 255, 0.25) !important;
+  box-shadow: var(--glass-shadow), 0 0 30px rgba(103, 82, 255, 0.15) !important;
+  backdrop-filter: var(--glass-blur) !important;
+  border-radius: 28px !important;
+  transition: all 0.4s ease-in-out;
+}
+
+/* Efekt ledové námrazy na okrajích obrazovky */
+#frost-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9998;
+  box-shadow: inset 0 0 60px rgba(0, 210, 255, 0.3);
+  background: radial-gradient(circle, transparent 60%, rgba(0, 210, 255, 0.12) 100%);
+  opacity: 0;
+  transition: opacity 0.6s ease-in-out;
+}
+
+#frost-overlay.active {
+  opacity: 1;
+  animation: frostPulse 3s infinite ease-in-out;
+}
+
+@keyframes frostPulse {
+  0%, 100% { box-shadow: inset 0 0 45px rgba(0, 210, 255, 0.35), inset 0 0 80px rgba(255, 255, 255, 0.05); }
+  50% { box-shadow: inset 0 0 85px rgba(0, 210, 255, 0.65), inset 0 0 130px rgba(255, 255, 255, 0.12); }
+}
+
+/* --- LEVEL 1: SVÍTILNA A 3D PRVKY --- */
+#game-grid {
+  gap: 5px !important;
+  background: rgba(10, 10, 25, 0.7) !important;
+  border: 2px solid rgba(127, 107, 255, 0.3) !important;
+  box-shadow: 0 0 35px rgba(103, 82, 255, 0.15), var(--shadow) !important;
+  backdrop-filter: blur(8px);
+  padding: 6px !important;
+}
+
+.cell {
+  border-radius: 8px !important;
+  transition: all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+
+
+/* Sova 3D kamenné zdi a pasti */
+.sova-view .cell.wall {
+  background: linear-gradient(135deg, #4b5563 0%, #1f2937 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: inset 0 3px 6px rgba(255,255,255,0.1), 0 4px 6px rgba(0,0,0,0.4) !important;
+}
+
+.sova-view .cell.trap {
+  background: radial-gradient(circle, rgba(231, 76, 60, 0.4) 0%, rgba(231, 76, 60, 0.1) 100%) !important;
+  border: 2px solid #e74c3c !important;
+  animation: trapPulse 1.5s infinite alternate ease-in-out !important;
+}
+
+@keyframes trapPulse {
+  from { box-shadow: 0 0 5px rgba(231, 76, 60, 0.5); filter: brightness(1); }
+  to { box-shadow: 0 0 15px rgba(231, 76, 60, 0.8); filter: brightness(1.25); }
+}
+
+.sova-view .cell.goal {
+  background: radial-gradient(circle, rgba(46, 204, 113, 0.5) 0%, rgba(46, 204, 113, 0.15) 100%) !important;
+  border: 2px solid #2ecc71 !important;
+  animation: goalPulse 1.5s infinite alternate ease-in-out !important;
+}
+
+@keyframes goalPulse {
+  from { box-shadow: 0 0 8px rgba(46, 204, 113, 0.6); }
+  to { box-shadow: 0 0 25px rgba(46, 204, 113, 1); }
+}
+
+/* Navigační pad */
+.navigation-pad {
+  background: rgba(20, 24, 54, 0.6) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 24px;
+  padding: 1.5rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+}
+
+.btn-nav {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 2px solid rgba(127, 107, 255, 0.25) !important;
+  color: var(--text) !important;
+  width: 60px;
+  height: 60px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  border-radius: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+
+.btn-nav:hover {
+  background: var(--primary) !important;
+  border-color: var(--primary-soft) !important;
+  box-shadow: 0 0 20px rgba(103, 82, 255, 0.7) !important;
+  transform: translateY(-2px) scale(1.05);
+}
+
+/* --- LEVEL 2: 3D KRYSTAL A TEPLOMĚRY --- */
+.crystal-scene {
+  position: relative;
+  width: 100%;
+  height: 100px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0.5rem 0;
+}
+
+.crystal-svg-container {
+  width: 80px;
+  height: 100px;
+  position: absolute;
+  left: calc(50% - 40px);
+  transition: left 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275), transform 0.8s ease-in-out;
+  animation: crystalFloat 2.5s infinite ease-in-out;
+  z-index: 10;
+}
+
+.crystal-svg-container.holder-player1 {
+  left: calc(50% - 150px);
+}
+
+.crystal-svg-container.holder-player2 {
+  left: calc(50% + 70px);
+}
+
+.crystal-svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 15px rgba(0, 210, 255, 0.7));
+  animation: crystalGlow 2s infinite alternate ease-in-out;
+}
+
+@keyframes crystalFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes crystalGlow {
+  from { filter: drop-shadow(0 0 8px rgba(0, 210, 255, 0.5)); }
+  to { filter: drop-shadow(0 0 22px rgba(0, 210, 255, 0.9)); }
+}
+
+/* Skleněný teploměr */
+.progress-bar {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.2);
+  height: 28px !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+}
+
+.progress-bar-bubbles {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.progress-bar .fill {
+  border-radius: 14px !important;
+  z-index: 1;
+}
+
+.bubble {
+  position: absolute;
+  bottom: -6px;
+  width: 4px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 50%;
+  animation: bubbleUp 1.6s infinite linear;
+}
+
+@keyframes bubbleUp {
+  0% { transform: translateY(0) scale(0.8); opacity: 0; }
+  20% { opacity: 0.7; }
+  100% { transform: translateY(-30px) scale(0.4); opacity: 0; }
+}
+
+/* --- LEVEL 3: RUNOVÉ SLOTY A OTŘES --- */
+.code-display {
+  display: flex;
+  gap: 0.8rem !important;
+  justify-content: center;
+}
+
+.code-display span {
+  width: 50px !important;
+  height: 60px !important;
+  border-radius: 10px;
+  border: 2px solid rgba(127, 107, 255, 0.3) !important;
+  background: rgba(10, 10, 25, 0.6) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem !important;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);
+  transition: all 0.25s ease;
+}
+
+.code-display span.filled {
+  border-color: #f1c40f !important;
+  box-shadow: 0 0 15px rgba(241, 196, 15, 0.4), inset 0 2px 8px rgba(0,0,0,0.2) !important;
+  text-shadow: 0 0 12px #f1c40f !important;
+}
+
+.shard-box {
+  background: rgba(20, 24, 54, 0.5) !important;
+  border: 1px solid rgba(127, 107, 255, 0.2) !important;
+  box-shadow: var(--shadow);
+  border-radius: 20px !important;
+  transition: all 0.3s ease;
+  animation: floatAnimation 4s infinite ease-in-out alternate;
+}
+
+.partner-shard {
+  animation-delay: 2s;
+}
+
+@keyframes floatAnimation {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-8px); }
+}
+
+/* Otřes celé sekce při chybě */
+.shake {
+  animation: screenShake 0.4s ease-in-out;
+}
+
+@keyframes screenShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+/* --- REFLEXE: 3D CARD FLIP A PARALLAX --- */
+.reflection-card-wrap {
+  perspective: 1000px;
+  width: 140px;
+  height: 140px;
+  margin: 1.5rem auto;
+}
+
+.reflection-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-style: preserve-3d;
+  cursor: pointer;
+}
+
+.reflection-card-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.reflection-card-front, .reflection-card-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 50%;
+  border: 3px solid var(--accent);
+  box-shadow: var(--glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.reflection-card-back {
+  transform: rotateY(180deg);
+  border-color: #2ecc71;
+  box-shadow: 0 0 20px rgba(46, 204, 113, 0.5);
+}
+
+.reflection-card-front img, .reflection-card-back img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Záblesk při otočení karty */
+.card-flash {
+  animation: flashBright 0.6s ease-out;
+}
+
+@keyframes flashBright {
+  0% { filter: brightness(1) contrast(1); }
+  30% { filter: brightness(2.5) contrast(1.2); }
+  100% { filter: brightness(1) contrast(1); }
+}
+
+/* Skleněný chat v reflexi */
+#reflection-chat-box {
+  background: rgba(10, 10, 25, 0.5) !important;
+  border: 1px solid rgba(127, 107, 255, 0.15) !important;
+  backdrop-filter: blur(10px);
+}
+
+/* --- ROZŠÍŘENÍ LEVELU 3: VOLBA A DETEKTOR LŽI --- */
+
+.scanning-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.scanning-text {
+  font-size: 0.9rem;
+  color: #f1c40f;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  animation: scanPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes scanPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.scanning-bar, .decrypt-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.scanning-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #f1c40f, #e67e22);
+  border-radius: 4px;
+  animation: fillScan 2s linear forwards;
+}
+
+@keyframes fillScan {
+  to { width: 100%; }
+}
+
+.decrypt-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #3498db, #9b59b6);
+  border-radius: 4px;
+  transition: width 0.1s linear;
+}
+
+.status-badge {
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.status-badge.success {
+  background: rgba(46, 204, 113, 0.15);
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.status-badge.error {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  animation: blinkError 1s infinite alternate;
+}
+
+@keyframes blinkError {
+  from { box-shadow: 0 0 5px rgba(231, 76, 60, 0.2); }
+  to { box-shadow: 0 0 15px rgba(231, 76, 60, 0.5); }
+}
+
+/* Výsledkové obrazovky brány */
+.gate-outcome-card {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 2.5rem;
+  text-align: center;
+  max-width: 500px;
+  width: 90%;
+  margin: 2rem auto;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+  animation: outcomeFadeIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.gate-outcome-card.escaped {
+  border: 2px solid #2ecc71;
+  box-shadow: 0 0 30px rgba(46, 204, 113, 0.25);
+}
+
+.gate-outcome-card.trapped {
+  border: 2px solid #e74c3c;
+  box-shadow: 0 0 30px rgba(231, 76, 60, 0.25);
+}
+
+.gate-outcome-icon {
+  font-size: 4.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.gate-outcome-card.escaped .gate-outcome-icon {
+  filter: drop-shadow(0 0 15px #2ecc71);
+  animation: floatEscaped 2s infinite ease-in-out;
+}
+
+.gate-outcome-card.trapped .gate-outcome-icon {
+  filter: drop-shadow(0 0 15px #e74c3c);
+  animation: shakeTrapped 1.5s infinite ease-in-out;
+}
+
+@keyframes outcomeFadeIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes floatEscaped {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes shakeTrapped {
+  0%, 100% { transform: rotate(0deg); }
+  20%, 60% { transform: rotate(-3deg); }
+  40%, 80% { transform: rotate(3deg); }
+}
+
