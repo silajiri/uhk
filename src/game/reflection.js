@@ -13,6 +13,7 @@ export function initReflection(db, pairId, role, animal) {
   const roomRef = ref(db, `rooms/${pairId}`);
 
   // Nejprve zapíšeme identitu hráče (jméno a avatar) do místnosti, aby ji partner mohl přečíst v odmaskování
+  // Změna souboru pro GIT
   const userData = JSON.parse(localStorage.getItem('uhkUser') || sessionStorage.getItem('uhkUser') || '{}');
   if (userData.name) {
     update(ref(db, `rooms/${pairId}/identities/${myPath}`), {
