@@ -2,6 +2,8 @@
 
 Krátké představení a cíle projektu — technické detaily najdete v `docs/architecture.md`.
 
+https://silajiri.github.io/uhk/
+
 ## 1. Cíle projektu
 *   **Hlavní cíl:** Vytvořit webovou hru pro žáky 4. a 5. třídy ZŠ (hranou na tabletech/noteboocích), která pomocí řízené anonymity a interaktivní reflexe pomůže narušit sociální předsudky ve třídě.
 *   **Herní cíl:** Hráči působí jako anonymní Strážci světla (Sova a Rys) a zakouší důsledky důvěry, podpory a upřímnosti v asymetrickém prostředí, kde o sobě nevědí nic jiného než vzájemné chování.
