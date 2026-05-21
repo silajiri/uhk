@@ -1,4 +1,5 @@
 import { ref, onValue, set, update, serverTimestamp, push } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js';
+import { getAuth, signOut } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js';
 
 export function initReflection(db, pairId, role, animal) {
   console.log(`Inicializace Reflexe pro místnost: ${pairId}, role: ${role}`);
@@ -41,6 +42,23 @@ export function initReflection(db, pairId, role, animal) {
             </div>
           </div>
         `;
+      }
+      return;
+    }
+
+    const myRoleKey = role === 'player1' ? 'player1' : 'player2';
+    const myDecision = room.revealDecisions?.[myRoleKey];
+
+    if (!myDecision) {
+      if (!root.querySelector('.reflection-choice-card')) {
+        renderChoiceScreen(root, db, pairId, myRoleKey);
+      }
+      return;
+    }
+
+    if (myDecision === 'rejected') {
+      if (!root.querySelector('.reflection-rejected-card')) {
+        renderRejectedScreen(root, db, pairId, myRoleKey);
       }
       return;
     }
@@ -430,4 +448,120 @@ function setupChatInput(db, pairId, role) {
       sendMessage();
     }
   };
+}
+
+function renderChoiceScreen(root, db, pairId, myRoleKey) {
+  root.innerHTML = `
+    <div class="module-card reflection-choice-card" style="max-width: 600px; text-align: center; animation: fadeIn 0.5s;">
+      <div class="module-tag">Fáze: Odhalení</div>
+      <h1 style="margin: 1.5rem 0;">Chceš zjistit, kdo byl tvým partnerem?</h1>
+      <p class="module-description" style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 2rem;">
+        Dokončili jste všechny úrovně hry! Nyní se můžeš rozhodnout, zda se chceš podívat, kdo byl tvým partnerem v této hře, a popovídat si s ním v závěrečném chatu.
+      </p>
+      
+      <div style="display: grid; grid-template-columns: 1fr; gap: 1rem; margin-bottom: 2rem;">
+        <div style="background: rgba(103, 82, 255, 0.1); border: 1px solid var(--border); border-radius: 16px; padding: 1.2rem; text-align: left;">
+          <span style="font-size: 1.25rem; margin-right: 0.5rem;">💡</span><strong>Pokud odhalení akceptuješ:</strong>
+          <ul style="margin: 0.5rem 0 0 1.2rem; padding: 0; font-size: 0.95rem; color: var(--text); line-height: 1.5;">
+            <li>Uvidíš statistiky vaší spolupráce.</li>
+            <li>Odhalí se ti pravé jméno a avatar spoluhráče.</li>
+            <li>Získáš možnost chatu se spoluhráčem a morální zhodnocení brány.</li>
+          </ul>
+        </div>
+        
+        <div style="background: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.25); border-radius: 16px; padding: 1.2rem; text-align: left;">
+          <span style="font-size: 1.25rem; margin-right: 0.5rem;">⚠️</span><strong>Pokud odhalení odmítneš:</strong>
+          <ul style="margin: 0.5rem 0 0 1.2rem; padding: 0; font-size: 0.95rem; color: var(--text); line-height: 1.5;">
+            <li><strong>Nebude</strong> ti zpřístupněn zpětný pohled ani závěrečný chat.</li>
+            <li>Tvá hra bude ukončena a identita partnera zůstane utajena.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <button id="btn-accept-reveal" class="btn-crystal" style="padding: 1.2rem; font-size: 1.2rem; cursor: pointer; font-weight: 600; text-transform: none; display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%;">
+          🔍 Ano, chci odhalit partnera
+        </button>
+        
+        <button id="btn-reject-reveal" class="btn-primary" style="padding: 1rem; font-size: 1.05rem; cursor: pointer; background: transparent; border: 1px solid var(--border); color: var(--muted); transition: all 0.2s; width: 100%;">
+          ❌ Ne, nechci to vědět
+        </button>
+      </div>
+    </div>
+  `;
+
+  const acceptBtn = root.querySelector('#btn-accept-reveal');
+  const rejectBtn = root.querySelector('#btn-reject-reveal');
+
+  if (rejectBtn) {
+    rejectBtn.onmouseover = () => {
+      rejectBtn.style.borderColor = 'rgba(231, 76, 60, 0.5)';
+      rejectBtn.style.color = '#e74c3c';
+    };
+    rejectBtn.onmouseout = () => {
+      rejectBtn.style.borderColor = 'var(--border)';
+      rejectBtn.style.color = 'var(--muted)';
+    };
+    rejectBtn.onclick = () => {
+      set(ref(db, `rooms/${pairId}/revealDecisions/${myRoleKey}`), 'rejected');
+    };
+  }
+
+  if (acceptBtn) {
+    acceptBtn.onclick = () => {
+      set(ref(db, `rooms/${pairId}/revealDecisions/${myRoleKey}`), 'accepted');
+    };
+  }
+}
+
+function renderRejectedScreen(root, db, pairId, myRoleKey) {
+  root.innerHTML = `
+    <div class="module-card reflection-rejected-card" style="max-width: 550px; text-align: center; animation: fadeIn 0.5s; border-color: rgba(231, 76, 60, 0.3);">
+      <div class="module-tag" style="background: rgba(231, 76, 60, 0.1); color: #e74c3c; border-color: rgba(231, 76, 60, 0.2);">Rozhodnutí: Skrytá identita</div>
+      <div style="font-size: 4rem; margin: 1.5rem 0 1rem 0;">🔒</div>
+      <h1 style="margin: 0 0 1rem 0; font-size: 1.8rem;">Identita partnera zůstává skryta</h1>
+      <p class="module-description" style="font-size: 1.05rem; line-height: 1.6; color: var(--text); margin-bottom: 2rem;">
+        Rozhodl(a) ses neodhalit svého herního partnera. Zpětný pohled a chat se spoluhráčem ti nebudou zpřístupněny.
+      </p>
+      
+      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 16px; padding: 1.2rem; margin-bottom: 2rem; text-align: left; font-size: 0.95rem; color: var(--muted); line-height: 1.5;">
+        Děkujeme za účast ve hře! Hra byla navržena pro rozvoj třídního kolektivu. Nyní se můžeš bezpečně odhlásit.
+      </div>
+
+      <button id="btn-logout-exit" class="btn-primary" style="padding: 1.2rem 2.5rem; font-size: 1.1rem; cursor: pointer; width: 100%; font-weight: 600; background: linear-gradient(135deg, #e74c3c, #c0392b); border-color: #e74c3c; box-shadow: 0 4px 15px rgba(231, 76, 60, 0.2);">
+        🚪 Odhlásit se a ukončit hru
+      </button>
+
+      <button id="btn-reconsider-reveal" style="background:none; border:none; color:var(--muted); text-decoration:underline; font-size:0.9rem; cursor:pointer; margin-top:1.5rem; transition:color 0.2s;">
+        Chci změnit své rozhodnutí a partnera odhalit
+      </button>
+    </div>
+  `;
+
+  const logoutBtn = root.querySelector('#btn-logout-exit');
+  const reconsiderBtn = root.querySelector('#btn-reconsider-reveal');
+
+  if (logoutBtn) {
+    logoutBtn.onclick = async () => {
+      logoutBtn.disabled = true;
+      logoutBtn.innerText = "Odhlašování...";
+      try {
+        const auth = getAuth();
+        await signOut(auth);
+      } catch (err) {
+        console.error("Firebase auth signOut error:", err);
+      }
+      localStorage.removeItem('uhkUser');
+      sessionStorage.removeItem('uhkUser');
+      window.location.href = 'index.html';
+    };
+  }
+
+  if (reconsiderBtn) {
+    reconsiderBtn.onmouseover = () => { reconsiderBtn.style.color = 'var(--accent)'; };
+    reconsiderBtn.onmouseout = () => { reconsiderBtn.style.color = 'var(--muted)'; };
+    reconsiderBtn.onclick = () => {
+      set(ref(db, `rooms/${pairId}/revealDecisions/${myRoleKey}`), 'accepted');
+    };
+  }
 }

@@ -85,6 +85,9 @@ export function analyzeRoomBehavior(room) {
   const rStatus = l3.rysShardStatus || ''; // 'true' | 'fake'
   const escapedPlayers = l3.escapedPlayers || { player1: 'waiting', player2: 'waiting' };
 
+  const sReveal = room.revealDecisions?.player1 || '';
+  const rReveal = room.revealDecisions?.player2 || '';
+
   let type = 'inprogress'; // 'cooperate' | 'betrayal-one' | 'betrayal-mutual' | 'inprogress'
   let desc = 'Čeká se na rozhodnutí';
   let sChoice = 'none';
@@ -137,7 +140,9 @@ export function analyzeRoomBehavior(room) {
     sOutcome,
     rOutcome,
     sDecrypted,
-    rDecrypted
+    rDecrypted,
+    sReveal,
+    rReveal
   };
 }
 
@@ -213,7 +218,7 @@ function getStateLabel(state) {
 }
 
 // Generate the visual output of Level 3 player status and decisions
-function renderL3StatusColumn(sName, sChoice, sOutcome, rName, rChoice, rOutcome) {
+function renderL3StatusColumn(sName, sChoice, sOutcome, sReveal, rName, rChoice, rOutcome, rReveal) {
   const getChoiceBadge = (choice) => {
     if (choice === 'truth') return '<span class="choice-tag truth">🟢 Pravda</span>';
     if (choice === 'lie') return '<span class="choice-tag lie">🔴 Lež</span>';
@@ -226,14 +231,22 @@ function renderL3StatusColumn(sName, sChoice, sOutcome, rName, rChoice, rOutcome
     return '<span class="status-badge offline" style="font-size:0.75rem;">Čeká</span>';
   };
 
+  const getRevealLabel = (reveal) => {
+    if (reveal === 'accepted') return '<span style="color:#2ecc71; font-weight:600;">Odhalení: Ano</span>';
+    if (reveal === 'rejected') return '<span style="color:#e74c3c; font-weight:600;">Odhalení: Ne</span>';
+    return '<span style="color:var(--muted);">Odhalení: —</span>';
+  };
+
   return `
     <div style="margin-bottom: 0.4rem;">
       <strong>Sova (${sName}):</strong><br>
-      ${getChoiceBadge(sChoice)} &nbsp; ${getOutcomeBadge(sOutcome)}
+      ${getChoiceBadge(sChoice)} &nbsp; ${getOutcomeBadge(sOutcome)}<br>
+      <small>${getRevealLabel(sReveal)}</small>
     </div>
     <div>
       <strong>Rys (${rName}):</strong><br>
-      ${getChoiceBadge(rChoice)} &nbsp; ${getOutcomeBadge(rOutcome)}
+      ${getChoiceBadge(rChoice)} &nbsp; ${getOutcomeBadge(rOutcome)}<br>
+      <small>${getRevealLabel(rReveal)}</small>
     </div>
   `;
 }
@@ -325,7 +338,7 @@ function renderTable() {
             L2: <span style="font-weight:600; color:${l2Resets > 0 ? 'var(--warning)' : 'var(--success)'}">${l2Resets}x</span>
           </td>
           <td>
-            ${renderL3StatusColumn(p1Name, behavior.sChoice, behavior.sOutcome, p2Name, behavior.rChoice, behavior.rOutcome)}
+            ${renderL3StatusColumn(p1Name, behavior.sChoice, behavior.sOutcome, behavior.sReveal, p2Name, behavior.rChoice, behavior.rOutcome, behavior.rReveal)}
           </td>
           <td>
             <span class="behavior-badge ${behaviorBadgeClass}">${behavior.desc}</span>
@@ -473,10 +486,12 @@ function exportStatsToCSV() {
     'Sova - Email',
     'Sova - L3 Volba',
     'Sova - L3 Výsledek',
+    'Sova - Odhalení',
     'Rys - Jméno',
     'Rys - Email',
     'Rys - L3 Volba',
     'Rys - L3 Výsledek',
+    'Rys - Odhalení',
     'Kooperační scénář',
     'Zrada (Popis chování)',
     'L1 Maze - Pády do pasti',
@@ -522,6 +537,14 @@ function exportStatsToCSV() {
     if (behavior.rOutcome === 'escaped') outcomeRys = 'Útěk';
     if (behavior.rOutcome === 'trapped') outcomeRys = 'Uvěznění';
 
+    let revealSova = 'Čeká';
+    if (behavior.sReveal === 'accepted') revealSova = 'Ano';
+    if (behavior.sReveal === 'rejected') revealSova = 'Ne';
+
+    let revealRys = 'Čeká';
+    if (behavior.rReveal === 'accepted') revealRys = 'Ano';
+    if (behavior.rReveal === 'rejected') revealRys = 'Ne';
+
     let scenario = 'Nedokončeno';
     if (behavior.type === 'cooperate') scenario = 'Spolupráce';
     if (behavior.type === 'betrayal-one') scenario = 'Jednostranná zrada';
@@ -534,10 +557,12 @@ function exportStatsToCSV() {
       p1Email,
       choiceSova,
       outcomeSova,
+      revealSova,
       p2Name,
       p2Email,
       choiceRys,
       outcomeRys,
+      revealRys,
       scenario,
       behavior.desc + ' - ' + behavior.details,
       l1Resets,
