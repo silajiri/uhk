@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
 import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
-import { getDatabase, ref, remove } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
+import { getDatabase, ref, remove, onValue, update, get } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyCq_5Ftr7L9c2zz7mFzVp4v-KfNdGuHyF8",
@@ -21,6 +22,7 @@ const db = getDatabase(app);
 // Questions array (temporary storage in memory)
 let questionsArray = [];
 let studentProfiles = [];
+let studentPairs = [];
 let availableAvatars = [];
 
 const AVATAR_PATH = 'assets/avatars/';
@@ -77,18 +79,25 @@ function parseStudentsList(text, profiles) {
   return pairs;
 }
 
-async function saveStudents() {
-  setButtonLoading('saveStudentsBtn', true, '✓ Uložit seznam žáků');
-  
+﻿async function saveStudents() {
+  const text = document.getElementById('studentsList').value;
+  if (!text.trim()) {
+    showMessage('studentsMessage', 'Prosím, zadejte seznam párů ve formátu: Jméno1;Jméno2', 'error');
+    return;
+  }
+
   try {
-    const text = document.getElementById('studentsList').value;
-    if (!text.trim()) {
-      throw new Error('Prosím, zadejte seznam párů ve formátu: Jméno1;Jméno2');
-    }
-
     const pairs = parseStudentsList(text, studentProfiles);
-    const idToken = await auth.currentUser.getIdToken();
+    await savePairsToServer(pairs);
+  } catch (err) {
+    showMessage('studentsMessage', err.message, 'error');
+  }
+}
 
+async function savePairsToServer(pairs) {
+  setButtonLoading('saveStudentsBtn', true, '✓ Uložit seznam žáků');
+  try {
+    const idToken = await auth.currentUser.getIdToken();
     const response = await fetch(SAVE_DATA_URL, {
       method: 'POST',
       headers: {
@@ -99,7 +108,6 @@ async function saveStudents() {
     });
 
     const result = await response.json();
-    
     if (!response.ok) {
       throw new Error(result.message || 'Chyba při ukládání');
     }
@@ -115,62 +123,41 @@ async function saveStudents() {
 
 async function loadStudents() {
   try {
-    // 1. Nejdříve se ujistíme, že máme načtené profily pro překlad e-mail -> jméno
-    // studentProfiles se plní v loadProfiles()
     if (studentProfiles.length === 0) await loadProfiles();
 
     const user = await new Promise((resolve) => {
-      if (auth.currentUser) {
-        return resolve(auth.currentUser);
-      }
+      if (auth.currentUser) return resolve(auth.currentUser);
       const unsubscribe = auth.onAuthStateChanged((currentUser) => {
         unsubscribe();
         resolve(currentUser);
       });
     });
 
-    if (!user) {
-      throw new Error('Uživatel není přihlášen');
-    }
+    if (!user) throw new Error('Uživatel není přihlášen');
 
     const idToken = await user.getIdToken();
     const response = await fetch(`${SAVE_DATA_URL}?type=pairs`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${idToken}`
-      }
+      headers: { 'Authorization': `Bearer ${idToken}` }
     });
 
     const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.message || 'Chyba při načítání studentů');
-    }
-
-    // Pokud se nepodaří načíst páry (např. chybí pairId v DB), zkusíme načíst aspoň jednotlivce
-    if (result.data && result.data.length === 0) {
-      const resStud = await fetch(`${SAVE_DATA_URL}?type=students`, {
-        headers: { 'Authorization': `Bearer ${idToken}` }
-      });
-      const studData = await resStud.json();
-      if (studData.status === 'success' && studData.data.length > 0) {
-        // Pokud nejsou páry, necháme pole prázdné nebo vypíšeme jména bez párů
-        return;
-      }
-    }
+    if (!response.ok) throw new Error(result.message || 'Chyba při načítání studentů');
 
     if (result.status === 'success' && Array.isArray(result.data)) {
+      studentPairs = result.data;
+      renderPairsTable();
       const lines = result.data.map((p) => {
-        // Přeložíme e-maily z DB zpět na čitelná jména pomocí profilů v paměti
         const profile1 = studentProfiles.find(s => s.email.toLowerCase() === p.email1.toLowerCase());
         const profile2 = studentProfiles.find(s => s.email.toLowerCase() === p.email2.toLowerCase());
-        
         const name1 = profile1 ? profile1.name : p.email1;
         const name2 = profile2 ? profile2.name : p.email2;
-        
         return `${name1};${name2}`;
       });
       document.getElementById('studentsList').value = lines.join('\n');
     } else {
+      studentPairs = [];
+      renderPairsTable();
       document.getElementById('studentsList').value = '';
     }
   } catch (err) {
@@ -178,6 +165,7 @@ async function loadStudents() {
     showMessage('studentsMessage', err.message, 'error');
   }
 }
+
 
 async function loadQuestions() {
   try {
@@ -364,7 +352,7 @@ function checkAdminAccess() {
   return true;
 }
 
-async function saveProfiles() {
+﻿async function saveProfiles() {
   const text = document.getElementById('profilesInput').value.trim();
   if (!text) return;
   
@@ -374,6 +362,10 @@ async function saveProfiles() {
     return { email, name, avatar, animal };
   });
 
+  await saveProfilesToServer(profiles);
+}
+
+async function saveProfilesToServer(profiles) {
   const user = await new Promise((resolve) => {
     if (auth.currentUser) return resolve(auth.currentUser);
     const unsubscribe = auth.onAuthStateChanged((u) => {
@@ -413,15 +405,263 @@ async function loadProfiles() {
   if (!user) return;
 
   const idToken = await user.getIdToken();
-  const resp = await fetch(`${SAVE_DATA_URL}?type=profiles`, {
-    headers: { 'Authorization': `Bearer ${idToken}` }
-  });
-  const result = await resp.json();
-  if (result.status === 'success') {
-    studentProfiles = result.data;
-    // Zde by se v budoucnu naplnily dropdowny v UI pro párování
+  try {
+    const resp = await fetch(`${SAVE_DATA_URL}?type=profiles`, {
+      headers: { 'Authorization': `Bearer ${idToken}` }
+    });
+    const result = await resp.json();
+    if (result.status === 'success') {
+      studentProfiles = result.data || [];
+      renderProfilesTable();
+    }
+  } catch (err) {
+    console.error("Chyba při načítání profilů:", err);
   }
 }
+
+﻿function renderProfilesTable() {
+  const container = document.getElementById('profilesListContainer');
+  if (!container) return;
+
+  if (!studentProfiles || studentProfiles.length === 0) {
+    container.innerHTML = '<p class="input-hint">Žádné uložené profily žáků.</p>';
+    return;
+  }
+
+  let html = `
+    <table class="monitoring-table" style="margin-top: 1rem; width: 100%;">
+      <thead>
+        <tr>
+          <th>E-mail</th>
+          <th>Jméno</th>
+          <th>Avatar</th>
+          <th>Náhled</th>
+          <th>Zvíře</th>
+          <th>Akce</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  studentProfiles.forEach((profile, index) => {
+    html += `
+      <tr data-index="${index}" style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 0.75rem;">${profile.email}</td>
+        <td style="padding: 0.75rem; font-weight: 600;">${profile.name}</td>
+        <td style="padding: 0.75rem; font-family: monospace;">${profile.avatar}</td>
+        <td style="padding: 0.75rem; text-align: center;">
+          <img src="assets/avatars/${profile.avatar}" alt="${profile.avatar}" style="width: 32px; height: 32px; object-fit: contain; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid var(--border); padding: 2px;" onerror="this.style.display='none';" />
+        </td>
+        <td style="padding: 0.75rem;">${profile.animal}</td>
+        <td style="padding: 0.75rem;">
+          <button class="btn-table-action btn-primary" data-action="edit-profile" data-index="${index}">✏️ Upravit</button>
+          <button class="btn-table-action btn-secondary" data-action="delete-profile" data-index="${index}" style="background: #ffe0e0; color: #e74c3c;">🗑️ Smazat</button>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `
+      </tbody>
+    </table>
+  `;
+
+  container.innerHTML = html;
+
+  // Bind actions
+  container.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.onclick = (e) => {
+      const action = btn.getAttribute('data-action');
+      const idx = parseInt(btn.getAttribute('data-index'), 10);
+
+      if (action === 'delete-profile') {
+        if (confirm(`Opravdu chcete smazat profil žáka ${studentProfiles[idx].name}?`)) {
+          const updated = [...studentProfiles];
+          updated.splice(idx, 1);
+          saveProfilesToServer(updated);
+        }
+      } else if (action === 'edit-profile') {
+        startInlineEdit(idx);
+      }
+    };
+  });
+}
+
+﻿function startInlineEdit(idx) {
+  const container = document.getElementById('profilesListContainer');
+  const row = container.querySelector(`tr[data-index="${idx}"]`);
+  if (!row) return;
+
+  const profile = studentProfiles[idx];
+
+  row.innerHTML = `
+    <td style="padding: 0.75rem;"><input type="text" class="edit-email" value="${profile.email}" style="width: 100%; padding: 0.4rem; background: #ffffff; border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-family: inherit;" /></td>
+    <td style="padding: 0.75rem;"><input type="text" class="edit-name" value="${profile.name}" style="width: 100%; padding: 0.4rem; background: #ffffff; border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-weight: 600; font-family: inherit;" /></td>
+    <td style="padding: 0.75rem;"><input type="text" class="edit-avatar" value="${profile.avatar}" style="width: 100%; padding: 0.4rem; background: #ffffff; border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-family: monospace;" /></td>
+    <td style="padding: 0.75rem; text-align: center;">
+      <img src="assets/avatars/${profile.avatar}" alt="${profile.avatar}" style="width: 32px; height: 32px; object-fit: contain; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid var(--border); padding: 2px;" onerror="this.style.display='none';" />
+    </td>
+    <td style="padding: 0.75rem;"><input type="text" class="edit-animal" value="${profile.animal}" style="width: 100%; padding: 0.4rem; background: #ffffff; border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-family: inherit;" /></td>
+    <td style="padding: 0.75rem;">
+      <button class="btn-table-action btn-primary" data-action="save-edit" style="background: rgba(46, 204, 113, 0.15); color: var(--success);">✓ Uložit</button>
+      <button class="btn-table-action btn-secondary" data-action="cancel-edit">✕ Zrušit</button>
+    </td>
+  `;
+
+  row.querySelector('button[data-action="save-edit"]').onclick = () => {
+    const email = row.querySelector('.edit-email').value.trim();
+    const name = row.querySelector('.edit-name').value.trim();
+    const avatar = row.querySelector('.edit-avatar').value.trim();
+    const animal = row.querySelector('.edit-animal').value.trim();
+
+    if (!email || !name || !avatar || !animal) {
+      alert("Všechna pole musí být vyplněna!");
+      return;
+    }
+
+    const updated = [...studentProfiles];
+    updated[idx] = { email, name, avatar, animal };
+    saveProfilesToServer(updated);
+  };
+
+  row.querySelector('button[data-action="cancel-edit"]').onclick = () => {
+    renderProfilesTable();
+  };
+}
+
+
+function renderPairsTable() {
+  const container = document.getElementById('pairsListContainer');
+  if (!container) return;
+
+  if (!studentPairs || studentPairs.length === 0) {
+    container.innerHTML = '<p class="input-hint">Žádné vytvořené páry.</p>';
+    return;
+  }
+
+  let html = `
+    <table class="monitoring-table" style="margin-top: 1rem; width: 100%;">
+      <thead>
+        <tr>
+          <th>Žák 1 (Sova)</th>
+          <th>Žák 2 (Rys)</th>
+          <th>Akce</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  studentPairs.forEach((pair, index) => {
+    const p1 = studentProfiles.find(s => s.email.toLowerCase() === pair.email1.toLowerCase());
+    const p2 = studentProfiles.find(s => s.email.toLowerCase() === pair.email2.toLowerCase());
+
+    const name1 = p1 ? p1.name : pair.email1;
+    const name2 = p2 ? p2.name : pair.email2;
+
+    html += `
+      <tr data-index="${index}" style="border-bottom: 1px solid var(--border);">
+        <td style="padding: 0.75rem;">
+          <strong>${name1}</strong><br>
+          <span class="input-hint">${pair.email1} (${pair.animal1 || 'Sova'})</span>
+        </td>
+        <td style="padding: 0.75rem;">
+          <strong>${name2}</strong><br>
+          <span class="input-hint">${pair.email2} (${pair.animal2 || 'Rys'})</span>
+        </td>
+        <td style="padding: 0.75rem;">
+          <button class="btn-table-action btn-primary" data-action="edit-pair" data-index="${index}">✏️ Upravit</button>
+          <button class="btn-table-action btn-secondary" data-action="delete-pair" data-index="${index}" style="background: #ffe0e0; color: #e74c3c;">🗑️ Smazat</button>
+        </td>
+      </tr>
+    `;
+  });
+
+  html += `
+      </tbody>
+    </table>
+  `;
+
+  container.innerHTML = html;
+
+  container.querySelectorAll('button[data-action]').forEach(btn => {
+    btn.onclick = (e) => {
+      const action = btn.getAttribute('data-action');
+      const idx = parseInt(btn.getAttribute('data-index'), 10);
+
+      if (action === 'delete-pair') {
+        const p = studentPairs[idx];
+        const p1 = studentProfiles.find(s => s.email.toLowerCase() === p.email1.toLowerCase());
+        const p2 = studentProfiles.find(s => s.email.toLowerCase() === p.email2.toLowerCase());
+        const name1 = p1 ? p1.name : p.email1;
+        const name2 = p2 ? p2.name : p.email2;
+
+        if (confirm(`Opravdu chcete smazat pár ${name1} a ${name2}?`)) {
+          const updated = [...studentPairs];
+          updated.splice(idx, 1);
+          savePairsToServer(updated);
+        }
+      } else if (action === 'edit-pair') {
+        startInlinePairEdit(idx);
+      }
+    };
+  });
+}
+
+﻿function startInlinePairEdit(idx) {
+  const container = document.getElementById('pairsListContainer');
+  const row = container.querySelector(`tr[data-index="${idx}"]`);
+  if (!row) return;
+
+  const pair = studentPairs[idx];
+
+  let select1 = `<select class="edit-student1" style="width: 100%; padding: 0.4rem; background: #ffffff; border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-family: inherit;">`;
+  let select2 = `<select class="edit-student2" style="width: 100%; padding: 0.4rem; background: #ffffff; border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-family: inherit;">`;
+
+  studentProfiles.forEach(sp => {
+    const isSel1 = sp.email.toLowerCase() === pair.email1.toLowerCase() ? 'selected' : '';
+    const isSel2 = sp.email.toLowerCase() === pair.email2.toLowerCase() ? 'selected' : '';
+    select1 += `<option value="${sp.email}" ${isSel1} style="background: #ffffff; color: var(--text);">${sp.name} (${sp.email})</option>`;
+    select2 += `<option value="${sp.email}" ${isSel2} style="background: #ffffff; color: var(--text);">${sp.name} (${sp.email})</option>`;
+  });
+  select1 += `</select>`;
+  select2 += `</select>`;
+
+  row.innerHTML = `
+    <td style="padding: 0.75rem;">${select1}</td>
+    <td style="padding: 0.75rem;">${select2}</td>
+    <td style="padding: 0.75rem;">
+      <button class="btn-table-action btn-primary" data-action="save-pair-edit" style="background: rgba(46, 204, 113, 0.15); color: var(--success);">✓ Uložit</button>
+      <button class="btn-table-action btn-secondary" data-action="cancel-pair-edit">✕ Zrušit</button>
+    </td>
+  `;
+
+  row.querySelector('button[data-action="save-pair-edit"]').onclick = () => {
+    const email1 = row.querySelector('.edit-student1').value;
+    const email2 = row.querySelector('.edit-student2').value;
+
+    if (email1 === email2) {
+      alert("Nemůžete spárovat stejného žáka se sebou samým!");
+      return;
+    }
+
+    const p1 = studentProfiles.find(s => s.email.toLowerCase() === email1.toLowerCase());
+    const p2 = studentProfiles.find(s => s.email.toLowerCase() === email2.toLowerCase());
+
+    const updated = [...studentPairs];
+    updated[idx] = {
+      email1: p1.email, animal1: p1.animal,
+      email2: p2.email, animal2: p2.animal
+    };
+    savePairsToServer(updated);
+  };
+
+  row.querySelector('button[data-action="cancel-pair-edit"]').onclick = () => {
+    renderPairsTable();
+  };
+}
+
+
+
 
 async function loadAvatars() {
   try {
@@ -570,9 +810,166 @@ export function initializeAdmin() {
     syncAvatarsFromFile();
   });
 
-  loadStudents();
+  ﻿  loadStudents();
   loadQuestions();
   loadProfiles();
   loadAvatars();
   setupAvatarGalleryToggle();
+  initLiveMonitoring();
 }
+
+let monitoringListenerUnsubscribe = null;
+
+﻿function initLiveMonitoring() {
+  const container = document.getElementById('roomsMonitoringList');
+  const refreshBtn = document.getElementById('refreshMonitoringBtn');
+  const unlockAllBtn = document.getElementById('unlockAllReflectionBtn');
+
+  if (!container) return;
+
+  // Funkce pro odemčení reflexe pro všechny
+  unlockAllBtn.onclick = async () => {
+    setButtonLoading('unlockAllReflectionBtn', true, '🔓 Odemykám...');
+    try {
+      const snap = await get(ref(db, 'rooms'));
+      const rooms = snap.val() || {};
+      const updates = {};
+      Object.keys(rooms).forEach(roomId => {
+        updates[`${roomId}/teacherControl/reflectionUnlocked`] = true;
+      });
+      await update(ref(db, 'rooms'), updates);
+      showMessage('monitoringMessage', 'Reflexe byla odemčena pro všechny místnosti.', 'success');
+    } catch (err) {
+      console.error(err);
+      showMessage('monitoringMessage', 'Chyba při odemykání: ' + err.message, 'error');
+    } finally {
+      setButtonLoading('unlockAllReflectionBtn', false, '🔓 Odemknout reflexi pro všechny');
+    }
+  };
+
+  // Funkce pro opětovné načtení
+  refreshBtn.onclick = () => {
+    showMessage('monitoringMessage', 'Stav místností byl aktualizován.', 'success');
+  };
+
+  const roomsRef = ref(db, 'rooms');
+  if (monitoringListenerUnsubscribe) {
+    monitoringListenerUnsubscribe();
+  }
+
+  monitoringListenerUnsubscribe = onValue(roomsRef, (snapshot) => {
+    const rooms = snapshot.val();
+    if (!rooms || Object.keys(rooms).length === 0) {
+      container.innerHTML = '<p class="input-hint">Žádné aktivní herní místnosti nebyly nalezeny. Spusťte hru u studentů.</p>';
+      return;
+    }
+
+    let html = `
+      <table class="monitoring-table">
+        <thead>
+          <tr>
+            <th>Místnost</th>
+            <th>Hráč 1 (Sova)</th>
+            <th>Hráč 2 (Rys)</th>
+            <th>Stav hry</th>
+            <th>Reflexe</th>
+            <th>Akce</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    Object.entries(rooms).forEach(([roomId, room]) => {
+      const p1 = room.players?.animal1 || {};
+      const p2 = room.players?.animal2 || {};
+
+      const p1Email = p1.email || 'Nenastaven';
+      const p2Email = p2.email || 'Nenastaven';
+
+      const p1Name = studentProfiles.find(s => s.email.toLowerCase() === p1Email.toLowerCase())?.name || p1.animal || 'Sova';
+      const p2Name = studentProfiles.find(s => s.email.toLowerCase() === p2Email.toLowerCase())?.name || p2.animal || 'Rys';
+
+      const p1Online = p1.status === 'online' ? 'online' : 'offline';
+      const p2Online = p2.status === 'online' ? 'online' : 'offline';
+
+      const gameState = room.state || 'level1';
+      const reflectionUnlocked = room.teacherControl?.reflectionUnlocked || false;
+
+      // Akční tlačítka pro konkrétní místnost
+      const reflectionBtnText = reflectionUnlocked ? '🔒' : '🔓';
+      const reflectionBtnClass = reflectionUnlocked ? 'btn-secondary' : 'btn-primary';
+
+      html += `
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding: 0.75rem; font-family: monospace; font-size: 0.8rem;">${roomId}</td>
+          <td style="padding: 0.75rem;">
+            <strong>${p1Name}</strong><br>
+            <span class="status-badge ${p1Online}">${p1Online}</span> <span class="input-hint">${p1Email}</span>
+          </td>
+          <td style="padding: 0.75rem;">
+            <strong>${p2Name}</strong><br>
+            <span class="status-badge ${p2Online}">${p2Online}</span> <span class="input-hint">${p2Email}</span>
+          </td>
+          <td style="padding: 0.75rem;">
+            <span class="level-badge">${gameState}</span>
+          </td>
+          <td style="padding: 0.75rem; font-weight: 700; color: ${reflectionUnlocked ? 'var(--success)' : 'var(--muted)'};">
+            ${reflectionUnlocked ? 'Odemčeno' : 'Uzamčeno'}
+          </td>
+          <td style="padding: 0.75rem;">
+            <button class="btn-table-action ${reflectionBtnClass}" data-action="toggle-reflection" data-room="${roomId}" data-current="${reflectionUnlocked}">
+              ${reflectionBtnText}
+            </button>
+            <button class="btn-table-action btn-secondary" data-action="restart-room" data-room="${roomId}" style="background: #ffe0d5; color: #ff6f79;">
+              🔄 Restart
+            </button>
+            <button class="btn-table-action btn-secondary" data-action="delete-room" data-room="${roomId}" style="background: #ffe0e0; color: #e74c3c;">
+              🗑️ Smazat
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `
+        </tbody>
+      </table>
+    `;
+
+    container.innerHTML = html;
+
+    // Nabindování eventů na kliknutí v tabulce
+    container.querySelectorAll('button[data-action]').forEach(btn => {
+      btn.onclick = async (e) => {
+        const action = btn.getAttribute('data-action');
+        const rId = btn.getAttribute('data-room');
+
+        if (action === 'toggle-reflection') {
+          const current = btn.getAttribute('data-current') === 'true';
+          await update(ref(db, `rooms/${rId}/teacherControl`), { reflectionUnlocked: !current });
+          showMessage('monitoringMessage', `Stav reflexe pro ${rId} změněn.`, 'success');
+        } else if (action === 'restart-room') {
+          if (confirm(`Opravdu chcete restartovat místnost ${rId} na Level 1?`)) {
+            await update(ref(db, `rooms/${rId}`), {
+              state: 'level1',
+              playerPosition: null,
+              actions: null,
+              'teacherControl/reflectionUnlocked': false
+            });
+            showMessage('monitoringMessage', `Místnost ${rId} byla restartována.`, 'success');
+          }
+        } else if (action === 'delete-room') {
+          if (confirm(`Opravdu chcete kompletně smazat místnost ${rId}?`)) {
+            await remove(ref(db, `rooms/${rId}`));
+            showMessage('monitoringMessage', `Místnost ${rId} byla smazána.`, 'success');
+          }
+        }
+      };
+    });
+  }, (err) => {
+    console.error("Chyba při načítání místností:", err);
+    container.innerHTML = `<p class="error-message" style="color: var(--error); background: rgba(231, 76, 60, 0.1); padding: 1rem; border-radius: 12px; border: 1px solid rgba(231, 76, 60, 0.2);">Chyba při načítání místností: ${err.message}.<br><br><small>Tip: Ujistěte se, že máte nasazená aktuální databázová pravidla (<code>firebase deploy --only database</code>) a že se váš přihlášený e-mail přesně shoduje s e-mailem v pravidlech.</small></p>`;
+  });
+}
+
+

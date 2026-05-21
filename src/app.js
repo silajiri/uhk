@@ -22,14 +22,29 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-function updateNavbar(animal, avatar) {
+function updateNavbar(role, animal, avatar) {
   const badgeEl = document.getElementById('playerBadge');
   const nameEl = document.getElementById('playerAnimalName');
   
-  if (nameEl) nameEl.textContent = animal || 'Načítám...';
+  const isSova = (role === 'player1');
+  const roleText = isSova ? '🦉 SOVA' : '🐾 RYS';
+  const roleColor = isSova ? 'var(--sova-color, #3498db)' : 'var(--rys-color, #e67e22)';
+  
+  if (nameEl) {
+    nameEl.innerHTML = `
+      <div style="font-size: 0.78rem; font-weight: 700; letter-spacing: 0.05em; color: var(--muted); text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
+        Role: <span style="color: ${roleColor}; font-weight: 800;">${roleText}</span>
+      </div>
+      <div style="font-size: 1.02rem; font-weight: 700; color: var(--text); margin-top: 1px;">
+        ${animal || (isSova ? 'Sova' : 'Rys')}
+      </div>
+    `;
+  }
   if (badgeEl) {
     const avatarPath = `assets/avatars/${avatar || 'default.svg'}`;
     badgeEl.innerHTML = `<img src="${avatarPath}" alt="Avatar" style="width:54px; height:54px; border-radius:50%; object-fit:cover;">`;
+    badgeEl.style.border = `2px solid ${roleColor}`;
+    badgeEl.style.boxShadow = `0 0 12px ${roleColor}66`;
   }
 }
 
@@ -69,7 +84,7 @@ function initGame() {
   }
 
   console.log(`Hra inicializována jako ${userData.animal} (${userData.role})`);
-  updateNavbar(userData.animal, userData.avatar);
+  updateNavbar(userData.role, userData.animal, userData.avatar);
   initGameRouter(db, userData.pairId, userData.role, userData.animal);
 }
 

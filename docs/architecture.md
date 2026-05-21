@@ -1,178 +1,193 @@
 # Architektura a technické specifikace
 
-Tento dokument obsahuje technické detaily, které jsou příliš rozsáhlé pro hlavní `README.md`:
+Tento dokument obsahuje technické detaily, které jsou specifické pro implementaci hry Strážci světla:
 
-- Správa stavů místnosti a synchronizace (heartbeat, reconnect)
-- Detailní JSON schéma databáze pro `rooms/{roomId}`
-- Požadavky na Firebase Security Rules
+- Správa stavů místnosti a synchronizace
+- Detailní JSON schéma databáze pro `rooms/{roomId}` a další uzly
+- Firebase Security Rules a zabezpečení
 - Administrátorské (teacher) rozhraní a řízení průběhu
+- Matchmaking a přihlašovací flow
 
-Poznámka: Pro přehlednější PRD zůstává v `README.md` pouze stručné představení a milníky vývoje. Kompletní technické požadavky jsou zde.
+---
 
 ## A. State Management a synchronizace
 
-Zásada: Firebase Realtime Database je jediným zdrojem pravdy pro aktuální stav místnosti.
+Firebase Realtime Database je jediným zdrojem pravdy pro aktuální stav místnosti a herní pozice.
 
-Stavy místnosti (příklad):
-- `waiting` – čekání na oba hráče
-- `playing` – oba hráči jsou připojeni a hra probíhá
-- `reflection_started` – reflexní fáze odemčena učitelem
-- `finished` – hra dokončena
+Stavy místnosti (`state`):
+- `level1` – asymetrická navigace v temném lese (Sova naviguje, Rys se slepě pohybuje)
+- `level2` – sdílení krystalu tepla po dobu 120s
+- `level3` – zadání 5místné brány pravdy ze sdílených úlomků
+- `reflection` – závěrečná reflexe a real-time chat po odmaskování
 
 Klientská logika:
-- **Matchmaking:** Probíhá na základě e-mailu žáka. Po přihlášení volá klient Cloud Function `lookupMappingByEmail`, která vrátí `pairId` a přiřazené zvíře (`animal`).
-- **Připojení:** Hráč se připojuje do Realtime Database na cestu `/rooms/{pairId}`. První připojený nastavuje `player1` a `uid1`, druhý `player2` a `uid2`.
-- **Heartbeat:** Klient periodicky (každých 5 s) aktualizuje svůj stav v místnosti pro detekci odpojení partnera.
-- Při reconnectu klient načte aktuální stav z `/rooms/{roomId}` a obnoví UI do odpovídající fáze.
-- UI musí podporovat zobrazení stavu partnera (online/offline/disconnected) a jasnou hlášku: "Parťák se odpojil, čekejte na návrat".
+- **Matchmaking:** Probíhá přes Google Workspace přihlášení. Klientský kód zavolá HTTPS Cloud Function `lookupMappingByEmail` na `https://europe-west1-uhk-game.cloudfunctions.net/lookupMappingByEmail`. Funkce bezpečně dohledá e-mail ve `/profiles` a `/mappings` a vrátí payload s `pairId`, zvířetem (`animal`), rolí (`player1`/`player2`), avatarem a skutečným jménem.
+- **Připojení (Presence):** Klient se zapíše na `/rooms/{pairId}/players/animal1` (Sova) nebo `animal2` (Rys) jako `status: "online"` a `lastSeen: serverTimestamp()`.
+- **Zpracování odpojení:** Při zavření prohlížeče se přes `.onDisconnect()` automaticky změní status na `offline`. Druhý hráč na to může reagovat upozorněním na obrazovce.
+- **Navbar a role:** Navbar v klientském rozhraní se dynamicky aktualizuje podle role (Sova / Rys) s barevně odlišeným svítícím ohraničením avataru podle role.
+
+---
 
 ## B. Detailní schéma databáze
 
-Navržená struktura (příklad):
+Skutečné rozvržení Realtime Database:
+
+```json
+{
+  "mappings": {
+    "jan,novak_at_skola,cz": {
+      "email": "jan.novak@skola.cz",
+      "animal": "Sova",
+      "pairId": "pair_1716260000_1",
+      "role": "player1"
+    },
+    "petr,svoboda_at_skola,cz": {
+      "email": "petr.svoboda@skola.cz",
+      "animal": "Rys",
+      "pairId": "pair_1716260000_1",
+      "role": "player2"
+    }
+  },
+  "profiles": {
+    "jan,novak_at_skola,cz": {
+      "name": "Jan Novák",
+      "avatar": "lion.svg",
+      "animal": "Sova"
+    },
+    "petr,svoboda_at_skola,cz": {
+      "name": "Petr Svoboda",
+      "avatar": "elephant.svg",
+      "animal": "Rys"
+    }
+  },
+  "questions": [],
+  "rooms": {
+    "pair_1716260000_1": {
+      "state": "level1" | "level2" | "level3" | "reflection",
+      "playerPosition": {
+        "x": 0,
+        "y": 0
+      },
+      "players": {
+        "animal1": {
+          "animal": "Sova",
+          "status": "online" | "offline",
+          "lastSeen": 1716260005000,
+          "uid": "UID-SOVA",
+          "email": "jan.novak@skola.cz"
+        },
+        "animal2": {
+          "animal": "Rys",
+          "status": "online" | "offline",
+          "lastSeen": 1716260006000,
+          "uid": "UID-RYS",
+          "email": "petr.svoboda@skola.cz"
+        }
+      },
+      "identities": {
+        "animal1": {
+          "name": "Jan Novák",
+          "avatar": "lion.svg"
+        },
+        "animal2": {
+          "name": "Petr Svoboda",
+          "avatar": "elephant.svg"
+        }
+      },
+      "actions": {
+        "level1_darkness": {
+          "map": [
+            [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 2, 0, 1, 0, 0, 0, 0]
+          ],
+          "startPos": { "x": 0, "y": 0 },
+          "goalPos": { "x": 9, "y": 9 },
+          "lastSignal": {
+            "type": "UP" | "DOWN" | "LEFT" | "RIGHT" | "STOP" | "TRAP",
+            "count": 1,
+            "timestamp": 1716260010000
+          },
+          "collision": {
+            "message": "⚠️ Pád do pasti!...",
+            "timestamp": 1716260012000
+          },
+          "resetCount": 0
+        },
+        "level2_warmth": {
+          "crystalHolder": "player1" | "player2",
+          "temperatures": {
+            "player1": 100,
+            "player2": 100
+          },
+          "startTime": 1716260050000,
+          "resetCount": 0,
+          "signal": "FREEZING" | null
+        },
+        "level3_truth": {
+          "fullCode": "A7X9K",
+          "sovaFragment": "A7---",
+          "rysFragment": "--X9K",
+          "sovaShared": true,
+          "rysShared": true,
+          "attempts": 0
+        }
+      },
+      "teacherControl": {
+        "reflectionUnlocked": false
+      },
+      "reflectionChat": {
+        "-O123456789abcdef": {
+          "sender": "player1" | "player2",
+          "text": "Ahoj, skvělá spolupráce!",
+          "timestamp": 1716260100000
+        }
+      }
+    }
+  }
+}
 ```
-/rooms/{roomId}/
-	state: "waiting" | "module_secret_active" | "module_help_active" | "module_support_active" | "reflection_started" | "finished"
-	currentModule: "secret" | "help" | "support" | "lie_detector"
-	phase: "action" | "reflection"
-	players:
-		animal1:
-			uid: "user-123"
-			status: "online" | "offline" | "disconnected"
-			lastSeen: 1680000000000
-			currentRole: "Hráč A"
-		animal2:
-			uid: "user-456"
-			status: "online" | "offline" | "disconnected"
-			lastSeen: 1680000005000
-			currentRole: "Hráč B"
-	actions:
-		secret:
-			animal1:
-				trust: true
-				timestamp: 1680000100000
-			animal2:
-				trust: false
-				timestamp: 1680000105000
-		help:
-			animal1:
-				supported: false
-				timestamp: 1680000200000
-		support:
-			animal2:
-				reaction: "encourage"  # nebo "mock"
-				timestamp: 1680000300000
-		lie_detector:
-			animal1:
-				declaredTreasure: 4
-			animal2:
-				declaredTreasure: 4
-			matched: true
-	presence:
-		animal1: true
-		animal2: false
-	teacherControl:
-		reflectionUnlocked: false
-		lastPhaseAdvance: 1680000000000
-```
-
-Poznámky ke schématu:
-- `actions` ukládejte atomicky pod module-uzly, aby byly snadno dotazovatelné při generování reflexe.
-- `presence` a `players/*/status` slouží k rychlému zobrazení online stavů v dashboardu.
-
-## D. Průběh aplikace a herní moduly
-
-### Průběh aplikace (User Flow)
-
-Hra je rozdělena do dvou fází, které společně vytvářejí systém "Ozvěny rozhodnutí":
-
-- **Fáze 1: Anonymní spolupráce (Akce)**
-  - Hráči plní úkoly ve dvojicích, neznají své skutečné identity a vidí pouze důvěru a herní symboly.
-  - Rozhodnutí se průběžně logují jako chování, které se později zhodnotí v reflexi.
-  - Modul "Tajemství": hráč musí poslat kód a před odesláním odpovědět na otázku "Věříš mu, že tě nepodrazí? (Ano/Ne)". Toto rozhodnutí se zobrazí až ve zpětném pohledu.
-  - Modul "Zastání se": když parťák uvízne, hra nabídne možnost ho zachránit za cenu vlastní rychlosti. Volba Ano/Ne se zaznamená.
-  - Modul "Výsměch vs. Podpora": pokud parťák zkazí minihru, druhému hráči se objeví ikony 👏 (Podpora) a 😂 (Výsměch). Musí jednu vybrat, aby hra pokračovala.
-
-- **Fáze 2: Integrovaná reflexe (Aha-moment)**
-  - Po dokončení hry se spustí interaktivní rekapitulace pro oba hráče.
-  - Krok A – "Co jsi o něm nevěděl": zobrazí se souhrn chování parťáka (např. kolikrát pomohl, kdy podržel a jak reagoval na chyby) a následně jeho skutečné jméno.
-  - Krok B – "Zrcadlo tvých pocitů": hráči uvidí svá vlastní předchozí rozhodnutí a musí reflektovat, co to znamená pro jejich očekávání a vztah.
-
-### Herní moduly a témata
-
-Navržené moduly nahrazují klasické úrovně a podporují práci s otázkami důvěry, podpory a upřímnosti:
-
-- **Sdílení klíče** (Téma: Sdílení tajemství)
-  - Hráč A získá tajnou informaci (kód), kterou musí poslat Hráči B. B ji může použít pro společný postup, nebo ji zneužít pro vlastní zisk.
-  - Reflexe se ptá: "Jaké to bylo svěřit svůj kód někomu, koho nevidíš? Bál ses, že tě zneužije?"
-
-- **Obranný štít** (Téma: Zastání se druhého)
-  - Hráč A je zablokovaný nepřítelem a Hráč B se rozhoduje, zda ho osvobodí za cenu vlastní energie.
-  - Reflexe se ptá: "Zastane se mě parťák, i když ho to něco stojí?"
-
-- **Aréna chyb** (Téma: Pomoc při neúspěchu)
-  - Modul probíhá v anonymní dvojici. Hráč A plní náročnou minihru; Hráč B vidí pokrok parťáka a volí anonymní podporu nebo výsměch.
-  - Cíl: zjistit, zda parťák podrží druhého i v případě chyby.
-
-- **Detektor lži** (Téma: Upřímnost)
-  - Na konci dvojice hráči nahlásí, kolik pokladů našli. Pokud souhlasí, dostanou bonus; pokud jeden lže, oba jej ztratí.
-  - Reflexe se ptá: "Vyplatilo se nám být k sobě upřímní?"
-
-- **Odmaskování (The Reveal)**
-  - Individuální reflexe: hráč vidí, jak se jeho parťák choval během hry, a poté klikne na tlačítko, aby odhalil jeho skutečné jméno.
-  - V textu je důraz na pozitivní závěrečné sdělení: "Tento hráč ti věřil, i když tě neviděl." 
-
-## C. Firebase Security Rules – doporučení
-
-Hlavní pravidla:
-- Mapovací tabulka (`/mappings`) nesmí být čitelná běžným hráčům (`.read: false`).
-- Matchmaking se provádí přes volatelnou Cloud Function `lookupMappingByEmail`; klient nikdy nečte uzel `/mappings` přímo.
-- Klient smí číst pouze uzel `/rooms/{roomId}` když je uživatel součástí této místnosti.
-- Odemknutí reflexe (přístup ke skutečným identitám) se řídí hodnotou `teacherControl/reflectionUnlocked` a čtení identity je povoleno až po jejím nastavení učitelem.
-
-Příklad výňatku pravidel (koncept):
-```
-{"rules": {
-	"rooms": {
-		"$roomId": {
-			".read": "auth != null && data.child('players').hasChild(auth.uid)",
-			".write": "auth != null && data.child('players').hasChild(auth.uid)"
-		}
-	},
-	"mappings": { ".read": false, ".write": false }
-}}
-```
-
-Poznámka: výše je koncept – bezpečnostní pravidla nutno upravit podle přesného modelu autentizace a teacher-rolí.
-
-## G. Google Workspace přihlášení a server-side matchmaking
-
-Matchmaking je implementován jako bezpečná volatelná Cloud Function.
-- Volatelná funkce: `lookupMappingByEmail`
-- Nasazeno na: `https://europe-west1-uhk-game.cloudfunctions.net/lookupMappingByEmail`
-- Klient se přihlásí přes Google Workspace účet (Firebase Auth), získá autorizovaný token a pošle své e-mailové jméno do funkce.
-- Funkce načte `mappings/{encodedEmail}` z Realtime Database a vrátí pairing metadata včetně `pairId`.
-- Klient použije `pairId` k připojení do pevně definované `rooms/{pairId}` místnosti.
-- E-mailové klíče v DB jsou enkódovány tak, že `.` jsou nahrazeny čárkami `,` a `@` řetězcem `_at_`.
-
-Tento přístup zajistí, že:
-- Klient nečte přímo citlivou mapovací tabulku `/mappings`.
-- Uživatelé i administrátor používají svůj Google Workspace účet.
-- Mapovací tabulka obsahuje explicitní páry `email -> pairId`, takže párování není náhodné.
-
-## H. Administrátorské rozhraní (Master Control)
-
-Požadavky pro učitelské UI:
-- Editace `mappings` a `matchings` (mapovací a párovací tabulky) – pouze pro ověřené učitele.
-- Tlačítko **Spustit další fázi** (global phase advance): učitel může jedním klikem odemknout `reflectionStarted`/`reflectionUnlocked` pro všechny místnosti, čímž se zabrání předčasnému odhalení identity.
-- Live Monitoring: seznam místností, stav, online/offline přehled, upozornění na offline hráče a možnost manuálního restartu místnosti.
-
-## E. Řešení lichého počtu žáků
-
-Poznámka: Lichý počet žáků se vyřeší na úrovni orchestrace (asistent systému nebo bot). Hra nepřidává logiku pro dynamické přerozdělování během běhu.
-
-## F. UI a připojení (UX)
-
-- UI musí jasně indikovat technické stavy: reconnecting, partner disconnected, waiting for teacher.
-- Text pro disconnect: "Parťák se odpojil, čekejte na návrat".
 
 ---
+
+## C. Firebase Security Rules – Bezpečnostní nastavení
+
+Zajišťují, že běžní žáci nemohou zjistit identitu svého partnera předčasně ani číst profily ostatních žáků:
+1. Uzly `/mappings` a `/profiles` jsou čitelné a zapisovatelné výhradně administrativními účty přes Cloud Function.
+2. Uzel `/questions` je čitelný pro všechny přihlášené uživatele.
+3. Uzel `/rooms` je globálně čitelný a zapisovatelný pouze specifikovaným administrátorským e-mailům (např. `sila.jiri@gmail.com`, `tereza.silova@zsjrk.cz`).
+4. Uzel `/rooms/$roomId` je čitelný a zapisovatelný pouze přihlášeným uživatelům, jejichž UID souhlasí s `players/animal1/uid` nebo `players/animal2/uid` v této místnosti (nebo pokud místnost ještě neexistuje).
+
+---
+
+## D. Průběh hry a Levely
+
+### Level 1: Spolehnutí ve tmě
+- **Téma:** Důvěra a navigace.
+- **Asymetrie:** Sova vidí mapu s překážkami (1) a pastmi (2) a posílá navigační signály. Rys se pohybuje v černé mřížce poslepu na základě velkých overlay šipek na displeji.
+- **Reset:** Vstup na past Rysa přemístí zpět na start, inkrementuje `resetCount` a na chvíli zablokuje pult Sovy.
+
+### Level 2: Sdílené teplo
+- **Téma:** Ohleduplnost a střídání zdrojů.
+- **Asymetrie:** Pouze držitel krystalu se zahřívá (+2%/s), druhý mrzne (-4%/s). Musí si krystal střídat.
+- **Nouzový signál:** Ne-držitel může vyslat signál "Mrznu!", který vyvolá červený slide-down banner na obrazovce držitele.
+- **Upozornění na selhání:** Pád teploty jednoho z nich na 0 % vyvolá celoobrazovkový modal "Jeden z vás zmrzl!" oznamující restart přežití zpět na začátek (120 sekund).
+
+### Level 3: Kód pravdy
+- **Téma:** Pravdomluvnost a sdílení informací.
+- **Asymetrie:** Sova vidí první 2 znaky 5místného kódu, Rys poslední 3 znaky. Každý musí odeslat svůj úlomek druhému.
+- **Zámek:** Po 3 neúspěšných pokusech o složení kódu se kód a úlomky v RTDB změní a hráčům se zobrazí modal "Kód se změnil!".
+
+### Fáze reflexe (Post-Game)
+- **Čekání:** Hráči čekají, dokud učitel na monitoringu neklikne na "Odemknout reflexi" (nastaví `teacherControl/reflectionUnlocked: true`).
+- **Odmaskování:** Statistický přehled o spáchaných chybách (resetLevel1, attemptsLevel3), stisknutí tlačítka pro odhalení parťáka a CSS 3D otočení karty odkrývající partnerovo skutečné jméno a avatar.
+- **Závěrečný chat:** Odemčení real-time chatovací bubliny (`reflectionChat`), kde si spolužáci mohou vyměnit zprávy, s viditelnými skutečnými jmény nad zprávami.
+
+---
+
+## E. Administrátorské rozhraní (Teacher Dashboard)
+
+Učitelské UI (`admin.html`) slouží pro přípravu a živý monitoring:
+1. **Import dat:** Umožňuje importovat profily studentů a definovat pevné dvojice studentů. Ukládá data do `/profiles` a `/mappings` přes zabezpečené Cloud Function endpointy.
+2. **Live Monitoring:** Zobrazuje v reálném čase tabulku všech vytvořených místností, jejich stav online/offline (podle presence zvířat) a aktuální herní fázi (Level 1, 2, 3, a Reflexe).
+3. **Globální řízení:** Tlačítko pro odemčení reflexe, které uvolní skutečná jména pro všechny místnosti naráz.
+4. **Manuální restart:** Možnost restartovat konkrétní místnost v případě chyb nebo odpojení žáků.

@@ -3,30 +3,33 @@
 Krátké představení a cíle projektu — technické detaily najdete v `docs/architecture.md`.
 
 ## 1. Cíle projektu
-*   **Hlavní cíl:** Vytvořit webovou hru pro žáky 5. třídy ZŠ (hranou na tabletech/noteboocích), která pomocí řízené anonymity a interaktivní reflexe pomůže narušit sociální předsudky ve třídě.
-*   **Herní cíl:** Hráči působí jako anonymní Strážci světla ve dvojicích a zakouší důsledky důvěry, podpory a upřímnosti v prostředí, kde o sobě nevědí nic jiného než vzájemné chování.
-*   **Pedagogický cíl (Integrovaná reflexe):** Hra má dvě hlavní fáze – Akci (anonymní spolupráce) a Zpětný pohled (interaktivní odhalení). Cílem je nejprve vytvořit anonymní zkušenost a poté vést žáky k tomu, aby na ni aplikovali svůj vlastní úsudek a očekávání.
+*   **Hlavní cíl:** Vytvořit webovou hru pro žáky 4. a 5. třídy ZŠ (hranou na tabletech/noteboocích), která pomocí řízené anonymity a interaktivní reflexe pomůže narušit sociální předsudky ve třídě.
+*   **Herní cíl:** Hráči působí jako anonymní Strážci světla (Sova a Rys) a zakouší důsledky důvěry, podpory a upřímnosti v asymetrickém prostředí, kde o sobě nevědí nic jiného než vzájemné chování.
+*   **Pedagogický cíl (Integrovaná reflexe):** Hra má dvě hlavní fáze – Akci (anonymní spolupráce ve 3 úrovních) a Zpětný pohled (interaktivní odmaskování a společný real-time chat). Cílem je nejprve vytvořit anonymní zkušenost a poté vést žáky k tomu, aby na ni aplikovali svůj vlastní úsudek a očekávání.
 
-## 2. Fáze vývoje (Milníky pro AI asistenta)
-*   **Krok 1: UI základ & Datový model** (Příprava HTML pro přihlášení a návrh JSON struktury pro Firebase mapovací tabulku a chování).
-*   **Krok 2: Cílený Matchmaking** (Přihlášení přes Google Workspace účet, server-side lookup e-mailu v bezpečné Firebase Cloud Function a přesměrování do předdefinované místnosti). Uživatelé i administrátor používají svůj Google účet.
-*   **Krok 3: Herní mechaniky & Logování** (Vytvoření herního rozhraní pro moduly Tajemství, Zastání se, Výsměch vs. Podpora a ukládání dat do databáze).
-*   **Krok 4: Modul "Post-Game Reflection"** (Interaktivní rekapitulace, odkrytí identity, zrcadlení vlastních rozhodnutí a zobrazení anonymních vzkazů).
+## 2. Herní úrovně a struktura
+Hra se skládá ze tří hlavních asymetrických úrovní a závěrečné reflexní fáze:
+1.  **Level 1: Spolehnutí ve tmě** (Asymetrická navigace v náhodně generovaném bludišti se zdmi a pastmi – Sova naviguje, Rys slepě chodí podle zaslaných signálů).
+2.  **Level 2: Sdílené teplo** (Společné střídání hřejivého krystalu po dobu 120 sekund; teplota nesmí klesnout na 0 %, jinak se čas resetuje a ukáže se varování).
+3.  **Level 3: Kód pravdy** (Skládání 5místného kódu ze dvou oddělených úlomků, které si hráči musí zaslat. Při 3 chybách se kód změní).
+4.  **Závěrečná reflexe** (Po schválení učitelem se zobrazí statistiky, otočením karty odhalí skutečné jméno parťáka a odemkne se volný real-time chat).
 
-Pro podrobné technické specifikace (DB schéma, životní cyklus místnosti, Firebase rules, admin control a další) otevřete [docs/architecture.md](docs/architecture.md).
-
-*   **Sokratovské dotazování (povinné pravidlo pro AI asistenta):** AI nesmí domýšlet řešení na základě vlastních předpokladů. Musí se zastavit a položit kontrolní otázku vždy, když nastane jedna z níže definovaných situací:
-	1. **Neznalost implementace:** AI nemá dostatek technických údajů nebo konkrétních parametrů k tomu, aby spolehlivě implementovala požadavek (např. chybějící formát dat, nejasné API, neznámé knihovny). V takovém případě se AI zastaví a konkrétně se dotáže na chybějící technické informace.
-	2. **Vícero výkladů zadání:** Zadání připouští více platných interpretací (např. nejednoznačné UX chování, nerozhodnuté okrajové případy nebo volby mezi různými algoritmy). AI se musí zastavit a nabídnout uživateli krátký výčet možných interpretací a zeptat se, kterou variantu preferuje.
-	3. **Interní rozpor v zadání:** Zadání obsahuje vzájemně si odporující požadavky nebo cíle (např. současné požadavky na anonymitu i export identit). AI musí upozornit na rozpor, popsat jej a požádat o jeho vyjasnění.
-	Zakázáno: doplňovat chybějící informace nebo dělat rozhodnutí místo uživatele na základě domněnek. Po zastavení položte jasnou, cílenou otázku, ne více hypotéz najednou.
+Podrobné chování a technické detaily jednotlivých úrovní najdete v [docs/GAME_MODULES_DEEP_DIVE.md](docs/GAME_MODULES_DEEP_DIVE.md).
 
 ## 3. Repo struktura
 Krátký přehled klíčových adresářů a souborů:
-- `public/` – statické HTML pro hru a administraci (`index.html`, `admin.html`).
-- `src/` – klientský kód a styly (`app.js`, `src/game/`, `src/admin/`, `src/styles/`).
-- `firebase/rules/` – Firebase security rules (`database.rules.json`).
-- `docs/` – dokumentace projektu; důležité soubory:
-	- `docs/architecture.md` (technické specifikace)
-	- `docs/gotchas.md` (metodické poznámky a pravidla — např. "žádné žebříčky", postup pro lichý počet žáků, psychologické bezpečí)
-- `tests/` – unit a e2e testy.
+- `index.html` – statické přihlášení přes Google Workspace.
+- `game.html` – hlavní herní klient s navbar badge (role) a herní plochou.
+- `admin.html` – učitelský dashboard pro matchmaking a monitoring.
+- `database.rules.json` – Firebase security rules.
+- `functions/` – Firebase Cloud Functions (Matchmaking `lookupMappingByEmail` a zápis dat `saveGameData` běžící v regionu `europe-west1`).
+- `src/` – klientský JavaScript:
+    - `src/app.js` – inicializace a update navbaru.
+    - `src/auth.js` – přihlašovací proces a handshake s Cloud Function.
+    - `src/game/` – logika hry (level1, level2, level3, router, reflexe a chat).
+    - `src/admin/` – monitorování a nahrávání dat učitelem.
+- `docs/` – dokumentace projektu:
+    - [docs/architecture.md](docs/architecture.md) (technické specifikace a JSON schéma)
+    - [docs/GAME_MODULES_DEEP_DIVE.md](docs/GAME_MODULES_DEEP_DIVE.md) (detailní průvodce herními levely a reflexí)
+    - [docs/gotchas.md](docs/gotchas.md) (metodické pokyny – zákaz žebříčků, psychologické bezpečí, lichý počet žáků)
+    - [docs/security.md](docs/security.md) (bezpečnostní zásady, přímé restrikce na RTDB)

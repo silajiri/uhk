@@ -1,68 +1,53 @@
 # PRD: Strážci světla – Kooperativní hra pro rozvoj třídního kolektivu
 
 ## 1. Cíle projektu
-*   **Hlavní cíl:** Vytvořit webovou hru pro žáky 5. třídy ZŠ (hranou na tabletech/noteboocích), která pomocí řízené anonymity a interaktivní reflexe pomůže narušit sociální předsudky ve třídě.
-*   **Herní cíl:** Hráči působí jako anonymní Strážci světla ve dvojicích a zakouší důsledky důvěry, podpory a upřímnosti v prostředí, kde o sobě nevědí nic jiného než vzájemné chování.
-*   **Pedagogický cíl (Integrovaná reflexe):** Hra má dvě hlavní fáze – Akci (anonymní spolupráce) a Zpětný pohled (interaktivní odhalení). Cílem je nejprve vytvořit anonymní zkušenost a poté vést žáky k tomu, aby na ni aplikovali svůj vlastní úsudek a očekávání.
+*   **Hlavní cíl:** Vytvořit webovou hru pro žáky 4. a 5. třídy ZŠ (hranou na tabletech/noteboocích), která pomocí řízené anonymity a interaktivní reflexe pomůže narušit sociální předsudky ve třídě.
+*   **Herní cíl:** Hráči působí jako anonymní Strážci světla (ve dvojicích Sova a Rys) a zakouší důsledky důvěry, podpory a upřímnosti v asymetrických úlohách, kde o sobě nevědí nic jiného než vzájemné chování.
+*   **Pedagogický cíl (Integrovaná reflexe):** Hra má dvě hlavní fáze – Akci (anonymní spolupráce ve 3 úrovních) a Zpětný pohled (interaktivní odhalení a real-time chat). Cílem je nejprve vytvořit anonymní zkušenost a poté vést žáky k tomu, aby na ni aplikovali svůj vlastní úsudek a očekávání.
 
 ## 2. Architektura a Technologie
-*   **Frontend:** Čisté HTML, CSS, Vanilla JavaScript. Prostředí musí být intuitivní a přizpůsobené pro dotykové ovládání na tabletech.
+*   **Frontend:** Čisté HTML, CSS, Vanilla JavaScript. Upraveno pro tablety a pomalu čtoucí žáky (velké texty, vyžadováno explicitní potvrzení instrukcí a chybových stavů).
 *   **Hosting:** GitHub Pages (statický web).
-*   **Backend / Databáze:** Firebase Realtime Database (pro synchronizaci stavu hry v reálném čase, striktně modulární Web SDK verze 9/10).
-*   **Systém identit (Zvířecí klíč):**
-    * Žáci se nepřihlašují jmény, ale unikátními názvy zvířat (např. Vlk, Orel).
-*   **Administrátorské rozhraní:** Webová stránka pro učitele, která je chráněná přístupem a umožňuje upravovat mapovací i párovací tabulku.
-*   **Anonymní dvojice:** Žáci jsou automaticky párováni do anonymních dvojic. Systém propojuje zvířata do dvojic podle pevného klíče zadaného učitelem v admin panelu. Párování není náhodné, ale pevně definované. Na obrazovce vidí svůj stav jako "Hráč A" a "Hráč B" a skóre vzájemné důvěry, ale ne skutečné identity.
+*   **Backend / Databáze:** Firebase Realtime Database (pro synchronizaci stavu hry a pozic v reálném čase, Web SDK verze 11).
+*   **Systém identit (Zvířecí přezdívky):**
+    * Žáci se nepřihlašují jmény, ale vystupují pod zvířecími rolemi (Sova jako player1, Rys jako player2).
+*   **Zobrazení rolí:** Role jsou jasně zobrazeny v horním topbaru (`Role: SOVA` / `Role: RYS`) včetně svítícího lemu avataru (modrý lem pro Sovu, oranžový pro Rysa) a na teploměrech.
+*   **Anonymní dvojice:** Žáci jsou automaticky párováni do anonymních dvojic podle pevného klíče zadaného učitelem v admin panelu.
 
-## 3. Datová struktura a Backend logika
-Hra vyžaduje specifickou přípravu databáze před samotným spuštěním:
-*   **Mapovací tabulka:** Databáze propojuje Skutečné jméno <-> Zvířecí přezdívka a přidružený avatar (např. Jan Novák = "Odvážný Sokol" + obrázek orla). Avatar pro přezdívku může být ikonický obrázek zvířete, který přispívá k anonymnímu hernímu zážitku. Skutečné jméno se převezme z přihlašovacího dialogu poskytnutého Google Workspace účtem.
-*   **Párovací tabulka (Matchmaking):** Předem fixně definované dvojice (na základě sociometrie), které jsou přiřazeny do konkrétních herních místností (např. "Odvážný Sokol" a "Bystrá Liška" hrají vždy spolu v `room_01`).
-*   **Action Log (Záznam historie):** Firebase musí v průběhu hry ukládat u každého hráče specifická rozhodnutí a indexy chování pro jednotlivé moduly: důvěra, podpora, sdílení informace, reakce na chybu a upřímnost.
-*   **Závěrečné hodnocení:** Mapovací i párovací tabulky budou využity při generování závěrečného hodnocení a reflexe hry, protože spojují anonymní přezdívky se skutečnými rolemi a herními skupinami.
-*   **Anonymní zpětné vazby:** Hráči mohou psát vzkazy svému parťákovi, které se později zobrazí jako anonymní "Třídní mapa upřímnosti".
+## 3. Datová struktura a Matchmaking
+*   **Mapovací a Profilová tabulka:** V databázi je uloženo propojení: e-mail -> přezdívka/role a e-mail -> skutečné jméno/avatar. Skutečné jméno je převzato z Google Workspace účtu.
+*   **Matchmaking (Cloud Function):** Klient nečte tabulky napřímo z důvodu bezpečnosti. Volá HTTPS Cloud Function `lookupMappingByEmail` nasazenou v regionu `europe-west1`. Ta ověří e-mail a vrátí pairId, zvíře, roli, skutečné jméno a avatar.
+*   **Bezpečnostní pravidla (Security Rules):** Přísně omezují čtení profilů a mapování. Klientský zápis je povolen pouze do vlastní místnosti `/rooms/{roomId}`.
 
-## 4. Průběh aplikace (User Flow)
-Hra je rozdělena do dvou fází, které spolu vytvářejí systém "Ozvěny rozhodnutí":
+## 4. Uživatelský průchod (User Flow)
+Hra je rozdělena do dvou fází:
 1.  **Fáze 1: Anonymní spolupráce (Akce)**
-    *   Hráči plní úkoly ve dvojicích, neznají své skutečné identity a vidí pouze důvěru a herní symboly.
-    *   Rozhodnutí se průběžně logují jako chování, které se později zhodnotí v reflexi.
-    *   Modul "Tajemství": Hráč musí poslat kód a před odesláním odpoví na otázku "Věříš mu, že tě nepodrazí? (Ano/Ne)". Toto soukromé rozhodnutí se zobrazí až ve zpětném pohledu.
-    *   Modul "Zastání se": Když parťák uvízne, hra nabídne možnost zachránit ho za cenu vlastní rychlosti. Rozhodnutí "Ano/Ne" se zaznamená.
-    *   Modul "Výsměch vs. Podpora": Pokud parťák zkazí minihru, druhému hráči se objeví dvě ikony: 👏 (Podpora) a 😂 (Výsměch). Musí jednu vybrat, aby hra pokračovala.
+    *   Hráči plní 3 asymetrické úrovně, neznají své skutečné identity a vidí se pouze jako „Sova“ a „Rys“.
+    *   Všechny herní akce (pohyby, signály, střídání krystalů) se synchronizují v reálném čase a logují.
+    *   **Zákaz odhlášení:** Pro zajištění plynulosti a zamezení rozpadu dvojic během hry bylo odstraněno tlačítko pro odhlášení z klientského rozhraní.
 2.  **Fáze 2: Integrovaná reflexe (Aha-moment)**
-    *   Po dokončení hry se spustí interaktivní rekapitulace pro oba hráče.
-    *   Krok A – "Co jsi o něm nevěděl": Hra ukáže konkrétní souhrn chování parťáka (např. kolikrát pomohl, kdy podržel a jak reagoval na chyby) a pak odhalí jeho skutečné jméno.
-    *   Krok B – "Zrcadlo tvých pocitů": Hráči uvidí svá vlastní předchozí rozhodnutí (např. nedůvěru při sdílení kódu, volbu podpory) a musí reflektovat, co to znamená pro jejich očekávání a vztah.
+    *   Po úspěšném splnění všech úrovní čekají žáci na uvolnění reflexe učitelem.
+    *   Zobrazí se přehled statistik (počet pádů v Levelu 1 a pokusů v Levelu 3).
+    *   Kliknutím na tlačítko se animací 3D otočení karty odhalí skutečné jméno spolužáka a jeho avatar s textem *„Tento hráč ti věřil, i když tě neviděl.“*
+    *   Otevře se **volný real-time chat**, kde si žáci mohou vyměnit pocity a poděkovat si.
 
-## 5. Herní moduly a témata
-Navržené moduly nahrazují klasické úrovně a podporují práci s otázkami důvěry, podpory a upřímnosti:
-*   **Sdílení klíče** (Téma: Sdílení tajemství)
-    *   Hráč A získá tajnou informaci (kód), kterou musí poslat Hráči B. B ji může použít pro společný postup, nebo ji zneužít pro vlastní zisk.
-    *   Reflexe se ptá: "Jaké to bylo svěřit svůj kód někomu, koho nevidíš? Bál ses, že tě zneužije?"
-*   **Obranný štít** (Téma: Zastání se druhého)
-    *   Hráč A je zablokovaný nepřítelem a Hráč B se rozhoduje, zda ho osvobodí za cenu vlastní energie.
-    *   Reflexe se ptá: "Zastane se mě parťák, i když ho to něco stojí?"
-*   **Aréna chyb** (Téma: Pomoc při neúspěchu)
-    * **Mechanika:** Modul probíhá striktně v rámci anonymní dvojice (peer-to-peer). 
-    * **Průběh:** Hráč A plní náročnou minihru (postřeh/logika). Hráč B vidí pokrok parťáka v reálném čase. Pokud Hráč A udělá chybu, Hráči B se zobrazí volba: poslat anonymní **podporu** (přidá parťákovi čas/pokus) nebo **výsměch** (vizuální šum na obrazovce parťáka).
-    * **Cíl:** Zjistit, zda mě parťák podrží, i když chybuji a on mě nevidí.
-*   **Detektor lži** (Téma: Upřímnost)
-    *   Na konci dvojice nahlásí, kolik pokladů našli. Pokud souhlasí, dostanou bonus; pokud jeden lže, oba jej ztratí.
-    *   Reflexe se ptá: "Vyplatilo se nám být k sobě upřímní?"
-* **Odmaskování** The Reveal (Aha-moment)modul*
-    * **Individuální reflexe:** Hráč vidí rekapitulaci: "Tvůj parťák [Zvíře] ti 3x pomohl, sdílel s tebou kód a podržel tě v Aréně chyb."
-    * **Odhalení:** Po kliknutí na tlačítko "Kdo byl můj strážce?" se ikona zvířete animací (např. otočením karty) změní na reálné jméno spolužáka z administrátorské tabulky.
-    * **Personalizace:** Zobrazení textu: "Tento hráč ti věřil, i když tě neviděl. Byl to **[Jméno]**."
+## 5. Herní úrovně
 
-## 6. Fáze vývoje (Milníky pro AI asistenta)
-*   **Krok 1: UI základ & Datový model** (Příprava HTML pro přihlášení a návrh JSON struktury pro Firebase mapovací tabulku a chování).
-*   **Krok 2: Cílený Matchmaking** (Napojení na Firebase – přečtení přezdívky, automatické spárování do anonymních dvojic a přesměrování do správné `room`).
-*   **Krok 3: Herní mechaniky & Logování** (Vytvoření herního rozhraní pro moduly Tajemství, Zastání se, Výsměch vs. Podpora a ukládání dat do databáze).
-*   **Krok 4: Modul "Post-Game Reflection"** (Interaktivní rekapitulace, odkrytí identity, zrcadlení vlastních rozhodnutí a zobrazení anonymních vzkazů).
+*   **Level 1: Spolehnutí ve tmě** (Téma: Důvěra a přebírání odpovědnosti)
+    *   Mřížka 10x10 se generuje procedurálně (náhodný start, cíl s Manhattan vzdáleností >= 6, 24 zdí a 6 pastí s BFS validací cesty).
+    *   Sova (Navigátor) vidí celou mapu lesa a navigační tlačítka v rozvržení šipek klávesnice. Rys (Slepý poutník) vidí jen tmu a svůj bod, pohybuje se šipkami na klávesnici na základě velkých blikajících signálů.
+    *   Kolize s pastí vrátí Rysa na start, zablokuje Sovu a vyvolá na obrazovce Rysa modal o srážce vyžadující potvrzení.
+*   **Level 2: Sdílené teplo** (Téma: Ohleduplnost a střídání zdrojů)
+    *   Ukazatele tepla Sovy a Ryse klesají tomu, kdo nemá krystal (-4 %/s), a rostou držiteli (+2 %/s). Barva se mění od červené přes zelenou po ledově modrou.
+    *   Hráči si musí krystal střídat a přežít **120 sekund**.
+    *   Mrznoucí hráč posílá signál „Mrznu!“, který držiteli krystalu zobrazí blikající varovný slide-down banner.
+    *   Pokud teplota klesne na 0 %, level se resetuje a oběma se zobrazí velký modal o zmrznutí a resetu času zpět na 120s.
+*   **Level 3: Kód pravdy** (Téma: Upřímnost a preciznost)
+    *   Brána je uzamčena 5místným kódem. Sova vidí začátek (např. `AB---`), Rys konec (např. `--CDE`).
+    *   Hráči si musí úlomky nasdílet tlačítkem přímého přenosu, složit kód dohromady a zadat ho na digitální klávesnici.
+    *   Při 3 chybách se kód změní, úlomky se regenerují a hráčům se zobrazí modal o resetu kódu.
 
-
-## 7. Metodické poznámky pro vývoj
-* **Cílené párování:** Hra musí umožnit učiteli v admin panelu manuálně definovat dvojice (např. "Vlk" s "Orlem"), aby bylo možné propojit lídry s izolovanými žáky.
-* **Absence žebříčků:** Systém nesmí zobrazovat globální pořadí "nejlepších" hráčů. Jediným měřítkem úspěchu je "Index společné důvěry" v rámci dvojice.
-* **Psychologické bezpečí:** Veškerá textová zpětná vazba v rámci reflexe musí být konstruktivní a směřovat k budování vztahu po odhalení identity.
+## 6. Metodické poznámky pro vývoj
+* **Cílené párování:** Učitel v admin panelu manuálně nahrává profilovou a párovací tabulku pro spojení lídrů s izolovaným žáky.
+* **Absence žebříčků:** Hra nezobrazuje globální žebříčky ani neporovnává žáky mezi sebou. Jediným měřítkem je úspěšné zdolání překážek ve dvojici.
+* **Potvrzování informací:** Kvůli pomalejšímu tempu čtení u mladších žáků (např. 4. třída) je důležité, aby se všechna klíčová hlášení (instrukce na začátku levelu, pád do pasti, zmrznutí, změna kódu) zobrazovala jako modální okna vyžadující aktivní potvrzení (např. tlačítkem „Přečetl jsem a rozumím“).

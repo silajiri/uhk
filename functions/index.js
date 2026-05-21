@@ -18,7 +18,9 @@ const ALLOWED_ORIGINS = [
 // List of authorized admin emails
 const ADMIN_EMAILS = [
   'sila.jiri@gmail.com',
+  'silajiri@gmail.com',
   'sila.tereza@gmail.com',
+  'silatereza@gmail.com',
   'tereza.silova@zsjrk.cz'
   // TODO: Add more admin emails here
 ];

@@ -8,6 +8,10 @@
   --muted: #9ba7ff;
   --accent: #7f6bff;
   --accent-soft: #5741ff;
+  --primary: #6752ff;
+  --primary-soft: #8373ff;
+  --sova-color: #3498db;
+  --rys-color: #e67e22;
   --glow: 0 0 40px rgba(127, 107, 255, 0.28);
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.24);
 }
@@ -16,15 +20,16 @@
   box-sizing: border-box;
 }
 
-html,
+﻿html,
 body {
   margin: 0;
   min-height: 100%;
   font-family: 'Fredoka', 'Segoe UI', sans-serif;
-  background: radial-gradient(circle at top, rgba(103, 82, 255, 0.08), transparent 35%),
-    linear-gradient(180deg, #f7f1ff 0%, #fffafa 100%);
+  background: radial-gradient(circle at top, rgba(103, 82, 255, 0.15), transparent 35%),
+    linear-gradient(180deg, #070b1d 0%, #0b0f19 100%);
   color: var(--text);
 }
+
 
 body {
   display: flex;
@@ -546,6 +551,181 @@ h1 {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+.low-warmth {
+  box-shadow: inset 0 0 100px rgba(255, 126, 95, 0.2);
+}
+
+/* --- LEVEL 3: KÓD PRAVDY --- */
+#level3-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 600px;
+}
+
+.shards-display {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  width: 100%;
+}
+
+.shard-box {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.shard-value {
+  font-family: monospace;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 4px;
+  background: rgba(0,0,0,0.3);
+  padding: 0.5rem;
+  border-radius: 8px;
+}
+
+.shard-value.revealed { color: #2ecc71; text-shadow: 0 0 10px #2ecc71; }
+
+.code-display { display: flex; gap: 0.5rem; margin: 1rem 0; }
+﻿.code-display span {
+  width: 45px;
+  height: 55px;
+  border-bottom: 3px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  font-weight: 700;
+  background: rgba(255,255,255,0.05);
+  color: #ffffff;
+}
+
+
+.keypad { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 1rem; }
+.keypad button { padding: 0.75rem 0.2rem; font-size: 1rem; font-weight: 700; background: var(--surface); border: 1px solid var(--border); color: white; border-radius: 8px; cursor: pointer; }
+.keypad button:hover { background: var(--accent-soft); }
+.keypad-actions { display: flex; gap: 1rem; margin-top: 1rem; width: 100%; }
+
+.flash-red { animation: flash-red-anim 0.5s; }
+@keyframes flash-red-anim { 0%, 100% { background: transparent; } 50% { background: rgba(231, 76, 60, 0.3); } }
+
+/* --- LEVEL 2: SDÍLENÉ TEPLO --- */
+
+#level2-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  width: 100%;
+  max-width: 500px;
+}
+
+.warmth-bars {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.bar-container {
+  width: 100%;
+}
+
+.bar-container label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.progress-bar {
+  width: 100%;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 15px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.progress-bar .fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff7e5f, #feb47b);
+  box-shadow: 0 0 20px rgba(255, 126, 95, 0.5);
+  transition: width 0.3s ease;
+}
+
+#crystal-status {
+  font-size: 1.5rem;
+  font-weight: 700;
+  padding: 1rem 2rem;
+  border-radius: 20px;
+  text-align: center;
+}
+
+#crystal-status.holder {
+  color: #00d2ff;
+  background: rgba(0, 210, 255, 0.1);
+  border: 1px solid rgba(0, 210, 255, 0.3);
+  animation: pulse-blue 2s infinite;
+}
+
+#crystal-status.freezing {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+#level2-controls button {
+  padding: 1.2rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-crystal {
+  background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+  color: white;
+  border: none;
+  box-shadow: 0 10px 30px rgba(0, 210, 255, 0.3);
+}
+
+#timer-display {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.flash-blue {
+  animation: flash-blue-anim 1s;
+}
+
+@keyframes flash-blue-anim {
+  0% { background: transparent; }
+  50% { background: rgba(0, 210, 255, 0.3); }
+  100% { background: transparent; }
+}
+
+@keyframes pulse-blue {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 210, 255, 0.4); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(0, 210, 255, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 210, 255, 0); }
+}
+
+/* Nízké teplo - varování */
+.low-warmth {
+  box-shadow: inset 0 0 100px rgba(255, 126, 95, 0.2);
 }
 
 /* Ovládací panel pro Sovu */

@@ -20,7 +20,9 @@ Tento soubor obsahuje věci, které nejsou přímo v kódu, ale musí být dodr�
 - Identita parťáka se odhaluje pouze po aktivaci reflexní fáze učitelem (`teacherControl/reflectionUnlocked`).
 - **Avataři:** Každý žák má přiřazené ID avataru (např. `lion.svg`), který se načítá z lokálního adresáře `assets/avatars/`. Toto mapování je uloženo v `/profiles`.
 - Matchmaking používá Google Workspace přihlášení a server-side Cloud Function `lookupMappingByEmail`.
-- Klient nesmí číst `/mappings` přímo; místo toho se spouští volání na `https://us-central1-uhk-game.cloudfunctions.net/lookupMappingByEmail`.
+- Klient nesmí číst `/mappings` přímo; místo toho se spouští volání na `https://europe-west1-uhk-game.cloudfunctions.net/lookupMappingByEmail`.
+- **Odebrání možnosti odhlášení:** Pro zabránění předčasného a neúmyslného odpojení hráčů v průběhu hry bylo z klientského herního rozhraní (`game.html`) zcela odstraněno tlačítko pro odhlášení. Odhlášení je možné pouze po skončení hry nebo v administraci učitele.
+
 
 ## 5. Admin workflow (krátké instrukce)
 - **Import profilů:** Učitel nahraje seznam třídy (formát: `email;jméno;avatar;zvíře`).

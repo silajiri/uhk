@@ -1,8 +1,15 @@
 import { ref, onValue, update, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js';
 import { initLevel1 } from './level1.js';
-// import { initLevel2 } from './level2.js'; // Budeme implementovat později
+import { initLevel2 } from './level2.js';
+import { initLevel3 } from './level3.js';
+import { initReflection } from './reflection.js';
 
 export function initGameRouter(db, pairId, role, animal) {
+  // Posluchač pro překreslení po odhalení identity
+  document.addEventListener('uhk-reveal-done', () => {
+    initReflection(db, pairId, role, animal);
+  });
+
   console.log(`Game Router spuštěn pro místnost: ${pairId}, role: ${role}`);
   
   if (!pairId || pairId === "undefined") {
@@ -42,13 +49,39 @@ export function initGameRouter(db, pairId, role, animal) {
             <div class="status-message">Připravte se, Mlžný les začíná chladnout...</div>
           </div>
         `;
+
+        // Automatický přechod po 5 sekundách
+        setTimeout(() => {
+          onValue(ref(db, `rooms/${pairId}/state`), (snap) => {
+            if (snap.val() === 'level2') {
+              initLevel2(db, pairId, role, animal);
+            }
+          }, { onlyOnce: true });
+        }, 5000);
         break;
       case 'level3':
-        root.innerHTML = "<div class='status-message'><h1>Level 3: Připravuje se...</h1></div>";
+        root.innerHTML = `
+          <div class="level-transition-card">
+            <div class="success-icon">💎</div>
+            <h1>Mráz ustupuje!</h1>
+            <p>Díky vaší obětavosti a střídání krystalu jste přečkali nejhorší noc. Mlha se rozestupuje a před vámi stojí Brána pravdy.</p>
+            <div class="status-message">Hledejte úlomky kódu v záři brány...</div>
+          </div>
+        `;
+
+        // Automatický přechod po 5 sekundách
+        setTimeout(() => {
+          onValue(ref(db, `rooms/${pairId}/state`), (snap) => {
+            if (snap.val() === 'level3') {
+              initLevel3(db, pairId, role);
+            }
+          }, { onlyOnce: true });
+        }, 5000);
         break;
       case 'reflection':
-        root.innerHTML = "<div class='status-message'><h1>Reflexe: Připravuje se...</h1></div>";
+        initReflection(db, pairId, role, animal);
         break;
+
       default:
         console.warn("Neznámý stav hry:", state);
     }

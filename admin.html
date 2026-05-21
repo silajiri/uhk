@@ -279,11 +279,61 @@
         width: 100%;
       }
 
-      .button-row {
+      ﻿      .button-row {
         flex-direction: column;
       }
     }
+
+    /* Monitoring table styles */
+    .monitoring-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+    .monitoring-table th, .monitoring-table td {
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .monitoring-table th {
+      font-weight: 600;
+      color: var(--primary);
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    .status-badge.online {
+      background: rgba(46, 204, 113, 0.15);
+      color: var(--success);
+    }
+    .status-badge.offline {
+      background: rgba(108, 95, 125, 0.15);
+      color: var(--muted);
+    }
+    .level-badge {
+      display: inline-block;
+      background: rgba(103, 82, 255, 0.1);
+      color: var(--primary);
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      font-weight: 600;
+    }
+    .btn-table-action {
+      padding: 0.4rem 0.6rem;
+      font-size: 0.8rem;
+      border-radius: 8px;
+      margin-right: 0.25rem;
+      font-weight: 600;
+      width: auto;
+      flex: none;
+    }
   </style>
+
 </head>
 <body>
   <div class="admin-container">
@@ -302,6 +352,9 @@
         <div class="input-hint">Formát: email;Jméno Příjmení;avatar_id;Zvíře (česky)</div>
       </div>
       <button class="btn-primary" id="saveProfilesBtn">Uložit profily</button>
+      <div id="profilesListContainer" style="margin-top: 1.5rem; overflow-x: auto;">
+        <p class="input-hint">Načítám profily...</p>
+      </div>
     </section>
 
     <!-- Galerie avatarů (Collapsible) -->
@@ -322,7 +375,7 @@
       </div>
     </section>
 
-    <!-- Správa žáků -->
+    ﻿    <!-- Správa žáků -->
     <section class="section">
       <h2>🤝 Párování (Matchmaking)</h2>
       <div id="studentsMessage" class="message"></div>
@@ -344,7 +397,24 @@
           <span>🗑️ Resetovat herní místnosti</span>
         </button>
       </div>
+      <div id="pairsListContainer" style="margin-top: 1.5rem; overflow-x: auto;">
+        <p class="input-hint">Načítám páry...</p>
+      </div>
     </section>
+
+    <!-- Živý monitoring místností -->
+    <section class="section">
+      <h2>📊 Živý monitoring místností</h2>
+      <div id="monitoringMessage" class="message"></div>
+      <div class="button-row" style="margin-bottom: 1.5rem;">
+        <button class="btn-primary" id="refreshMonitoringBtn" style="max-width: 250px;">🔄 Znovu načíst</button>
+        <button class="btn-secondary" id="unlockAllReflectionBtn" style="background: #e0f8e0; color: #27ae60; max-width: 350px;">🔓 Odemknout reflexi pro všechny</button>
+      </div>
+      <div id="roomsMonitoringList" style="overflow-x: auto;">
+        <p class="input-hint">Načítám aktivní místnosti...</p>
+      </div>
+    </section>
+
 
     <!-- Správa otázek -->
     <section class="section">
