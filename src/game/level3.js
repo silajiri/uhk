@@ -5,7 +5,6 @@ export function initLevel3(db, pairId, role) {
   const root = document.getElementById('game-root');
   const dataRef = ref(db, `rooms/${pairId}/actions/level3_truth`);
 
-  let partnerScanState = 'unscanned'; // 'unscanned' | 'scanning' | 'scanned_true' | 'scanned_fake' | 'decrypting' | 'decrypted'
   let transitionTimerStarted = false;
   let currentData = null;
   let currentFakeFragment = null;
@@ -56,9 +55,8 @@ export function initLevel3(db, pairId, role) {
   const text = "Tvoje role v této úrovni: <strong style='color: " + (isSova ? "var(--sova-color, #3498db)" : "var(--rys-color, #e67e22)") + "; font-size: 1.3rem;'>" + (isSova ? "🦉 SOVA (Skladač kódu)" : "🐾 RYS (Skladač kódu)") + "</strong>.<br><br>" +
     "Brána z lesa je uzamčena 5místným kódem. Každý z vás vidí pouze část kódu a zbytek má skrytý pod pomlčkami.<br><br>" +
     "1. **Rozhodni se, zda budeš spolupracovat:** Můžeš poslat pravdivý úlomek, nebo parťáka oklamat a poslat falešný (lež).<br>" +
-    "2. Jakmile ti partner pošle svůj úlomek, uvidíš ho v pravém boxu. **Můžeš otestovat jeho pravost** detektorem lži.<br>" +
-    "3. Pokud odhalíš lež, můžeš spustit 15s dešifrování pro získání skutečného kódu.<br>" +
-    "4. **Složte kód dohromady**, vyťukejte ho a aktivujte bránu. **Pokud jsi lhal, brána tě odhalí a uvězní!**";
+    "2. Jakmile ti partner pošle svůj úlomek, uvidíš ho v pravém boxu.<br>" +
+    "3. **Složte kód dohromady**, vyťukejte ho a aktivujte bránu.";
   showInstructionsModal(title, text);
   
   let enteredCode = "";
@@ -69,10 +67,12 @@ export function initLevel3(db, pairId, role) {
   // Inicializace dat (Sova generuje kód)
   if (isSova) {
     get(dataRef).then(snap => {
-      if (!snap.exists()) {
+      const data = snap.val();
+      const needsInit = !snap.exists() || !data || !data.fullCode || !data.sovaFragment || !data.rysFragment ||
+                        (data.escapedPlayers && (data.escapedPlayers.player1 !== 'waiting' || data.escapedPlayers.player2 !== 'waiting'));
+      if (needsInit) {
         set(dataRef, generateLevel3Data());
       } else {
-        const data = snap.val();
         if (!data.escapedPlayers) {
           update(dataRef, {
             escapedPlayers: {
@@ -108,7 +108,16 @@ export function initLevel3(db, pairId, role) {
   document.getElementById('btn-submit-code').onclick = () => {
     if (enteredCode.length < 5) return;
 
-    if (currentFullCode && enteredCode === currentFullCode) {
+    const partnerSharedValue = isSova ? (currentData?.rysShardValue || '') : (currentData?.sovaShardValue || '');
+    const myFragment = isSova ? (currentData?.sovaFragment || '') : (currentData?.rysFragment || '');
+
+    const myCombinedCode = isSova 
+      ? combineFragments(myFragment, partnerSharedValue)
+      : combineFragments(partnerSharedValue, myFragment);
+
+    const isCorrect = (currentFullCode && enteredCode === currentFullCode) || (myCombinedCode && enteredCode === myCombinedCode);
+
+    if (isCorrect) {
         // Správný kód!
         const myStatusRef = ref(db, `rooms/${pairId}/actions/level3_truth/escapedPlayers/${isSova ? 'player1' : 'player2'}`);
         const myShardStatus = isSova ? (currentData?.sovaShardStatus || '') : (currentData?.rysShardStatus || '');
@@ -184,55 +193,12 @@ export function initLevel3(db, pairId, role) {
     }
   }
 
-  // Funkce pro skenování
-  function startScanning(data) {
-    partnerScanState = 'scanning';
-    renderPartnerShardBox(data);
-    
-    setTimeout(() => {
-      const partnerShardStatus = isSova ? data.rysShardStatus : data.sovaShardStatus;
-      if (partnerShardStatus === 'true') {
-        partnerScanState = 'scanned_true';
-      } else {
-        partnerScanState = 'scanned_fake';
-      }
-      renderPartnerShardBox(data);
-    }, 2000);
-  }
-
-  // Funkce pro dešifrování
-  function startDecrypting(data) {
-    partnerScanState = 'decrypting';
-    renderPartnerShardBox(data);
-
-    const duration = 15000;
-    const intervalTime = 100;
-    let elapsed = 0;
-
-    const timer = setInterval(() => {
-      elapsed += intervalTime;
-      const percentage = Math.min((elapsed / duration) * 100, 100);
-      const secondsLeft = Math.ceil((duration - elapsed) / 1000);
-
-      const fillEl = partnerShardBox.querySelector('.decrypt-bar-fill');
-      const labelEl = partnerShardBox.querySelector('#decrypt-time-label');
-
-      if (fillEl) fillEl.style.width = percentage + '%';
-      if (labelEl) labelEl.textContent = `Dešifrování: ${secondsLeft}s`;
-
-      if (elapsed >= duration) {
-        clearInterval(timer);
-        partnerScanState = 'decrypted';
-        renderPartnerShardBox(data);
-      }
-    }, intervalTime);
-  }
-
   // Funkce pro dynamický render partnerova boxu
   function renderPartnerShardBox(data) {
     const partnerShared = isSova ? data.rysShared : data.sovaShared;
     if (!partnerShared) {
       partnerShardBox.dataset.scanState = 'waiting_sharing';
+      delete partnerShardBox.dataset.shardValue;
       partnerShardBox.innerHTML = `
         <label>Úlomek parťáka</label>
         <div class="shard-value">???</div>
@@ -242,78 +208,18 @@ export function initLevel3(db, pairId, role) {
     }
 
     const partnerShardValue = isSova ? data.rysShardValue : data.sovaShardValue;
-    const partnerTrueShard = isSova ? data.rysFragment : data.sovaFragment;
 
-    // Zamezení překreslení DOM, pokud stav a hodnota zůstaly stejné
-    if (partnerShardBox.dataset.scanState === partnerScanState && partnerShardBox.dataset.shardValue === partnerShardValue) {
+    // Zamezení překreslení DOM, pokud hodnota zůstala stejná
+    if (partnerShardBox.dataset.shardValue === partnerShardValue) {
       return;
     }
-    partnerShardBox.dataset.scanState = partnerScanState;
     partnerShardBox.dataset.shardValue = partnerShardValue;
 
-    if (partnerScanState === 'unscanned') {
-      partnerShardBox.innerHTML = `
-        <label>Úlomek parťáka</label>
-        <div class="shard-value">${partnerShardValue}</div>
-        <button id="btn-scan-partner" class="btn-primary" style="margin-top: 0.5rem; width: 100%; font-size: 0.9rem; padding: 0.6rem 0.5rem; background: var(--accent); border-color: var(--accent-soft);">🔍 Otestovat pravost</button>
-      `;
-      const scanBtn = partnerShardBox.querySelector('#btn-scan-partner');
-      if (scanBtn) {
-        scanBtn.onclick = () => startScanning(data);
-      }
-    } else if (partnerScanState === 'scanning') {
-      partnerShardBox.innerHTML = `
-        <label>Úlomek parťáka</label>
-        <div class="shard-value">${partnerShardValue}</div>
-        <div class="scanning-container">
-          <div class="scanning-text">🔍 Skenování pravosti...</div>
-          <div class="scanning-bar">
-            <div class="scanning-bar-fill"></div>
-          </div>
-        </div>
-      `;
-    } else if (partnerScanState === 'scanned_true') {
-      partnerShardBox.innerHTML = `
-        <label>Úlomek parťáka</label>
-        <div class="shard-value revealed">${partnerShardValue}</div>
-        <div style="margin-top: 0.5rem;">
-          <span class="status-badge success">🟢 Úlomek je pravdivý</span>
-        </div>
-      `;
-    } else if (partnerScanState === 'scanned_fake') {
-      partnerShardBox.innerHTML = `
-        <label>Úlomek parťáka</label>
-        <div class="shard-value" style="color: #e74c3c; border-color: #e74c3c;">${partnerShardValue}</div>
-        <div style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; align-items: center;">
-          <span class="status-badge error">🔴 Úlomek je falešný!</span>
-          <button id="btn-decrypt" class="btn-primary" style="width: 100%; font-size: 0.85rem; padding: 0.5rem; background: #e67e22; border-color: #d35400;">⚡ Dešifrovat pravdivý kód (15s)</button>
-        </div>
-      `;
-      const decryptBtn = partnerShardBox.querySelector('#btn-decrypt');
-      if (decryptBtn) {
-        decryptBtn.onclick = () => startDecrypting(data);
-      }
-    } else if (partnerScanState === 'decrypting') {
-      partnerShardBox.innerHTML = `
-        <label>Úlomek parťáka</label>
-        <div class="shard-value" style="color: #e74c3c; border-color: #e74c3c;">${partnerShardValue}</div>
-        <div style="margin-top: 0.5rem; width: 100%; display: flex; flex-direction: column; gap: 0.4rem; align-items: center;">
-          <span class="status-badge error" style="font-size: 0.75rem;">🔴 Úlomek je falešný!</span>
-          <div style="font-size: 0.85rem; color: #3498db;" id="decrypt-time-label">Dešifrování: 15s</div>
-          <div class="decrypt-bar">
-            <div class="decrypt-bar-fill" style="width: 0%;"></div>
-          </div>
-        </div>
-      `;
-    } else if (partnerScanState === 'decrypted') {
-      partnerShardBox.innerHTML = `
-        <label>Dešifrovaný úlomek parťáka</label>
-        <div class="shard-value revealed">${partnerTrueShard}</div>
-        <div style="margin-top: 0.5rem;">
-          <span class="status-badge success" style="background: rgba(52, 152, 219, 0.15); color: #3498db; border-color: rgba(52, 152, 219, 0.3);">🔓 Skutečný kód dešifrován</span>
-        </div>
-      `;
-    }
+    partnerShardBox.innerHTML = `
+      <label>Úlomek parťáka</label>
+      <div class="shard-value revealed">${partnerShardValue}</div>
+      <div style="font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem;">Úlomek byl úspěšně přijat.</div>
+    `;
   }
 
   // Listener pro změny v kódu a sdílení
@@ -348,7 +254,6 @@ export function initLevel3(db, pairId, role) {
     // Detekce resetu kódu po 3 pokusech
     if (lastKnownAttempts === 3 && currentAttempts === 0) {
       showCodeResetModal();
-      partnerScanState = 'unscanned';
       currentFakeFragment = null;
       const shareContainer = document.getElementById('my-share-container');
       if (shareContainer) {
@@ -415,22 +320,21 @@ export function initLevel3(db, pairId, role) {
       }
     }
 
-    const partnerShared = isSova ? data.rysShared : data.sovaShared;
-    if (!partnerShared) {
-      partnerScanState = 'unscanned';
-    }
-
     // Render partner box
     renderPartnerShardBox(data);
 
     attemptsEl.textContent = `Pokusy: ${currentAttempts}/3`;
     if (currentAttempts >= 3 && isSova) {
-        console.log("Dosaženo limitu pokusů, regeneruji kód...");
         get(ref(db, `rooms/${pairId}/actions/level3_truth/escapedPlayers`)).then(snap => {
           const currentEscaped = snap.val() || { player1: 'waiting', player2: 'waiting' };
-          const newData = generateLevel3Data();
-          newData.escapedPlayers = currentEscaped;
-          set(dataRef, newData);
+          if (currentEscaped.player1 === 'waiting' && currentEscaped.player2 === 'waiting') {
+            console.log("Dosaženo limitu pokusů, regeneruji kód...");
+            const newData = generateLevel3Data();
+            newData.escapedPlayers = currentEscaped;
+            set(dataRef, newData);
+          } else {
+            console.log("Jeden z hráčů již dokončil hru. Reset kódu je zablokován.");
+          }
         });
     }
   });
@@ -548,4 +452,19 @@ function showCodeResetModal() {
       overlay.remove();
     };
   }
+}
+
+function combineFragments(frag1, frag2) {
+  if (!frag1 || !frag2) return "";
+  let result = "";
+  for (let i = 0; i < 5; i++) {
+    const c1 = frag1[i] || '-';
+    const c2 = frag2[i] || '-';
+    if (c1 !== '-') {
+      result += c1;
+    } else {
+      result += c2;
+    }
+  }
+  return result;
 }

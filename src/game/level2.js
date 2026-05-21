@@ -1,29 +1,51 @@
 import { ref, onValue, set, update, serverTimestamp, get } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js';
 
-export function initLevel2(db, pairId, role, animal) {
+export function initLevel2(db, pairId, role, animal, avatar) {
   const isSova = (role === 'player1');
   const root = document.getElementById('game-root');
   
+  let myAnimal = animal || (isSova ? 'Sova' : 'Rys');
+  let myAvatar = avatar || 'default.svg';
+  let partnerAnimal = isSova ? 'Rys' : 'Sova';
+  let partnerAvatar = 'default.svg';
+  let sovaAnimal = isSova ? myAnimal : partnerAnimal;
+  let rysAnimal = !isSova ? myAnimal : partnerAnimal;
+
+  let instructionsShown = false;
+  let instructionsDismissed = false;
+  let levelFinished = false;
+  let intervalId = null;
+  let currentTemps = { player1: 100, player2: 100 };
+  let lastKnownResetCount = null;
+  let levelStartTime = null;
+  let levelRefListenerRegistered = false;
+
+  // Reference pro odhlášení listenerů při opuštění levelu
+  let unsubscribePlayers = null;
+  let unsubscribeLevel = null;
+  let unsubscribeState = null;
+
   // UI Konstrukce
   root.innerHTML = `
     <div id="level2-container">
       <div id="frost-overlay"></div>
-      <div class="role-indicator-header" style="text-align: center; margin-bottom: 0.8rem; font-family: 'Fredoka', 'Segoe UI', sans-serif;">
-        <span style="background: var(--primary); color: white; padding: 0.4rem 1.2rem; border-radius: 20px; font-size: 1rem; font-weight: bold; box-shadow: var(--shadow); border: 2px solid rgba(255, 255, 255, 0.1); display: inline-block;">
-          Jsi: ${isSova ? '🦉 SOVA' : '🐾 RYS'}
+      <div id="level2-role-header" class="role-indicator-header" style="text-align: center; margin-bottom: 0.8rem; font-family: 'Fredoka', 'Segoe UI', sans-serif;">
+        <span style="background: var(--primary); color: white; padding: 0.4rem 1.2rem; border-radius: 20px; font-size: 1rem; font-weight: bold; box-shadow: var(--shadow); border: 2px solid rgba(255, 255, 255, 0.1); display: inline-flex; align-items: center; gap: 8px; justify-content: center;">
+          <img src="assets/avatars/${myAvatar}" alt="Avatar" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid rgba(255,255,255,0.4);" />
+          <span>Jsi: <strong style="color: ${isSova ? 'var(--sova-color, #3498db)' : 'var(--rys-color, #e67e22)'}">${myAnimal}</strong> (Teplotní strážce)</span>
         </span>
       </div>
       <div class="level-instructions" style="display: none;"></div>
       <div class="warmth-bars">
         <div class="bar-container">
-          <label>Teplo Sovy ${isSova ? '<span class="role-ty-badge" style="background: rgba(52, 152, 219, 0.18); color: var(--sova-color, #3498db); padding: 0.2rem 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; border: 1px solid rgba(52, 152, 219, 0.35); margin-left: 0.5rem; display: inline-block; box-shadow: 0 0 10px rgba(52, 152, 219, 0.25);">TY</span>' : ''}</label>
+          <label id="label-player1">Teplo: Sova ${isSova ? '<span class="role-ty-badge" style="background: rgba(52, 152, 219, 0.18); color: var(--sova-color, #3498db); padding: 0.2rem 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; border: 1px solid rgba(52, 152, 219, 0.35); margin-left: 0.5rem; display: inline-block; box-shadow: 0 0 10px rgba(52, 152, 219, 0.25);">TY</span>' : ''}</label>
           <div class="progress-bar">
             <div id="bar-player1" class="fill" style="width: 100%"></div>
             <div class="progress-bar-bubbles" id="bubbles-player1"></div>
           </div>
         </div>
         <div class="bar-container">
-          <label>Teplo Ryse ${!isSova ? '<span class="role-ty-badge" style="background: rgba(230, 126, 34, 0.18); color: var(--rys-color, #e67e22); padding: 0.2rem 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; border: 1px solid rgba(230, 126, 34, 0.35); margin-left: 0.5rem; display: inline-block; box-shadow: 0 0 10px rgba(230, 126, 34, 0.25);">TY</span>' : ''}</label>
+          <label id="label-player2">Teplo: Rys ${!isSova ? '<span class="role-ty-badge" style="background: rgba(230, 126, 34, 0.18); color: var(--rys-color, #e67e22); padding: 0.2rem 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; border: 1px solid rgba(230, 126, 34, 0.35); margin-left: 0.5rem; display: inline-block; box-shadow: 0 0 10px rgba(230, 126, 34, 0.25);">TY</span>' : ''}</label>
           <div class="progress-bar">
             <div id="bar-player2" class="fill" style="width: 100%"></div>
             <div class="progress-bar-bubbles" id="bubbles-player2"></div>
@@ -32,6 +54,13 @@ export function initLevel2(db, pairId, role, animal) {
       </div>
       
       <div class="crystal-scene">
+        <!-- Levý avatar (Sova) -->
+        <div id="crystal-avatar-player1" class="crystal-avatar player1-avatar">
+          <img src="assets/avatars/default.svg" id="crystal-img-player1" alt="Sova" />
+          <span class="avatar-label" id="crystal-label-player1">Sova</span>
+        </div>
+
+        <!-- Krystal -->
         <div id="crystal-svg-container" class="crystal-svg-container holder-none">
           <svg class="crystal-svg" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
             <polygon points="50,5 95,45 80,105 50,115 20,105 5,45" fill="rgba(0, 210, 255, 0.45)" stroke="#00d2ff" stroke-width="2.5" />
@@ -42,6 +71,12 @@ export function initLevel2(db, pairId, role, animal) {
             <line x1="50" y1="5" x2="5" y2="45" stroke="#ffffff" stroke-width="0.5" opacity="0.6" />
             <circle cx="50" cy="60" r="8" fill="#ffffff" filter="blur(3px)" opacity="0.6" />
           </svg>
+        </div>
+
+        <!-- Pravý avatar (Rys) -->
+        <div id="crystal-avatar-player2" class="crystal-avatar player2-avatar">
+          <img src="assets/avatars/default.svg" id="crystal-img-player2" alt="Rys" />
+          <span class="avatar-label" id="crystal-label-player2">Rys</span>
         </div>
       </div>
 
@@ -59,111 +94,222 @@ export function initLevel2(db, pairId, role, animal) {
   const timerEl = document.getElementById('timer-display');
   const levelRef = ref(db, `rooms/${pairId}/actions/level2_warmth`);
 
-  // Zobrazení instrukcí jako modal ke schválení (vhodné pro pomalu čtoucí žáky)
-  const title = isSova ? "Sova (Teplotní strážce)" : "Rys (Teplotní strážce)";
-  const text = "Tvoje role v této úrovni: <strong style='color: " + (isSova ? "var(--sova-color, #3498db)" : "var(--rys-color, #e67e22)") + "; font-size: 1.3rem;'>" + (isSova ? "🦉 SOVA" : "🐾 RYS") + "</strong>.<br><br>" +
-    "Ocitli jste se v mrazivé mlze, která vám postupně ubírá teplo. Uprostřed obrazovky vidíte své teplotní bary.<br><br>" +
-    "Pouze držitel krystalu se zahřívá, zatímco druhý hráč mrzne. **Musíte si krystal střídat** klikáním na tlačítko tak, aby nikdo z vás nezmrzl (teplota nesmí klesnout na 0).<br><br>" +
-    "Pokud začínáte mrznout, klikněte na tlačítko <em>Mrznu! Potřebuji teplo!</em>, které upozorní vašeho parťáka. Musíte spolu vydržet 120 sekund.";
-
-  let instructionsDismissed = false;
-  let intervalId = null;
-  let currentTemps = { player1: 100, player2: 100 };
-  let lastKnownResetCount = null;
-  let levelStartTime = null;
-
-  showInstructionsModal(title, text, () => {
-    instructionsDismissed = true;
-    // Spustíme interval na základě aktuálních dat v DB
-    get(levelRef).then((snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        manageWarmthInterval(data.crystalHolder, role, db, pairId);
+  // Odhlášení všech listenerů a intervalů při opuštění Levelu 2
+  const stateRef = ref(db, `rooms/${pairId}/state`);
+  unsubscribeState = onValue(stateRef, (stateSnap) => {
+    const currentState = stateSnap.val();
+    if (currentState !== 'level2') {
+      levelFinished = true;
+      console.log("Cleaning up Level 2 resources...");
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
       }
-    });
+      if (unsubscribePlayers) unsubscribePlayers();
+      if (unsubscribeLevel) unsubscribeLevel();
+      if (unsubscribeState) unsubscribeState();
+
+      // Odstranění overlayů a bannerů Levelu 2 z dokumentu
+      const overlays = ['instructions-modal', 'waiting-overlay', 'reset-overlay', 'crystal-alert-banner'];
+      overlays.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+      });
+    }
   });
 
-  // Prvotní nastavení (pouze Sova inicializuje level)
-  if (isSova) {
-    update(levelRef, {
-      crystalHolder: 'player1',
-      'temperatures/player1': 100,
-      'temperatures/player2': 100,
-      startTime: serverTimestamp(),
-      resetCount: 0
-    });
-  }
+  // Načtení detailů obou hráčů z DB
+  const playersRef = ref(db, `rooms/${pairId}/players`);
+  unsubscribePlayers = onValue(playersRef, (snapshot) => {
+    const players = snapshot.val() || {};
+    const p1 = players.animal1 || {};
+    const p2 = players.animal2 || {};
 
-  // Hlavní listener stavu levelu
-  onValue(levelRef, (snapshot) => {
-    const data = snapshot.val();
-    if (!data) return;
+    if (isSova) {
+      if (p2.animal) partnerAnimal = p2.animal;
+      if (p2.avatar) partnerAvatar = p2.avatar;
+    } else {
+      if (p1.animal) partnerAnimal = p1.animal;
+      if (p1.avatar) partnerAvatar = p1.avatar;
+    }
 
-    // 1. Aktualizace ukazatelů teploty
-    if (data.temperatures) {
-      currentTemps = data.temperatures;
-      
-      const bar1 = document.getElementById('bar-player1');
-      const bar2 = document.getElementById('bar-player2');
-      const t1 = data.temperatures.player1;
-      const t2 = data.temperatures.player2;
+    sovaAnimal = p1.animal || (isSova ? myAnimal : partnerAnimal);
+    rysAnimal = p2.animal || (!isSova ? myAnimal : partnerAnimal);
 
-      bar1.style.width = `${t1}%`;
-      const color1 = getWarmthColor(t1);
-      bar1.style.background = color1;
-      bar1.style.boxShadow = `0 0 20px ${color1.replace('rgb', 'rgba').replace(')', ', 0.5)')}`;
+    const sovaAvatarVal = p1.avatar || (isSova ? myAvatar : partnerAvatar);
+    const rysAvatarVal = p2.avatar || (!isSova ? myAvatar : partnerAvatar);
 
-      bar2.style.width = `${t2}%`;
-      const color2 = getWarmthColor(t2);
-      bar2.style.background = color2;
-      bar2.style.boxShadow = `0 0 20px ${color2.replace('rgb', 'rgba').replace(')', ', 0.5)')}`;
-      
-      const myTemp = isSova ? t1 : t2;
-      const frostOverlay = document.getElementById('frost-overlay');
-      if (frostOverlay) {
-        if (myTemp < 30) {
-          frostOverlay.classList.add('active');
-          const targetOpacity = Math.max(0.3, (30 - myTemp) / 30);
-          frostOverlay.style.opacity = targetOpacity;
-        } else {
-          frostOverlay.classList.remove('active');
-          frostOverlay.style.opacity = 0;
+    const img1 = document.getElementById('crystal-img-player1');
+    const img2 = document.getElementById('crystal-img-player2');
+    const lbl1 = document.getElementById('crystal-label-player1');
+    const lbl2 = document.getElementById('crystal-label-player2');
+
+    if (img1) img1.src = `assets/avatars/${sovaAvatarVal}`;
+    if (img2) img2.src = `assets/avatars/${rysAvatarVal}`;
+    if (lbl1) lbl1.textContent = sovaAnimal;
+    if (lbl2) lbl2.textContent = rysAnimal;
+
+    // Aktualizace záhlaví
+    const headerEl = document.getElementById('level2-role-header');
+    if (headerEl) {
+      headerEl.innerHTML = `
+        <span style="background: var(--primary); color: white; padding: 0.4rem 1.2rem; border-radius: 20px; font-size: 1rem; font-weight: bold; box-shadow: var(--shadow); border: 2px solid rgba(255, 255, 255, 0.1); display: inline-flex; align-items: center; gap: 8px; justify-content: center;">
+          <img src="assets/avatars/${myAvatar}" alt="Avatar" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid rgba(255,255,255,0.4);" />
+          <span>Jsi: <strong style="color: ${isSova ? 'var(--sova-color, #3498db)' : 'var(--rys-color, #e67e22)'}">${myAnimal}</strong> (Teplotní strážce)</span>
+        </span>
+      `;
+    }
+
+    // Aktualizace popisků u teplotních barů
+    const label1 = document.getElementById('label-player1');
+    const label2 = document.getElementById('label-player2');
+    if (label1) {
+      label1.innerHTML = `Teplo: ${sovaAnimal} ${isSova ? '<span class="role-ty-badge" style="background: rgba(52, 152, 219, 0.18); color: var(--sova-color, #3498db); padding: 0.2rem 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; border: 1px solid rgba(52, 152, 219, 0.35); margin-left: 0.5rem; display: inline-block; box-shadow: 0 0 10px rgba(52, 152, 219, 0.25);">TY</span>' : ''}`;
+    }
+    if (label2) {
+      label2.innerHTML = `Teplo: ${rysAnimal} ${!isSova ? '<span class="role-ty-badge" style="background: rgba(230, 126, 34, 0.18); color: var(--rys-color, #e67e22); padding: 0.2rem 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; border: 1px solid rgba(230, 126, 34, 0.35); margin-left: 0.5rem; display: inline-block; box-shadow: 0 0 10px rgba(230, 126, 34, 0.25);">TY</span>' : ''}`;
+    }
+
+    if (!levelRefListenerRegistered) {
+      levelRefListenerRegistered = true;
+
+      // Hlavní listener stavu levelu
+      unsubscribeLevel = onValue(levelRef, (snapshot) => {
+        const data = snapshot.val();
+        if (!data) return;
+
+        // 1. Aktualizace ukazatelů teploty
+        if (data.temperatures) {
+          currentTemps = data.temperatures;
+          
+          const bar1 = document.getElementById('bar-player1');
+          const bar2 = document.getElementById('bar-player2');
+          const t1 = data.temperatures.player1;
+          const t2 = data.temperatures.player2;
+
+          if (bar1) {
+            bar1.style.width = `${t1}%`;
+            const color1 = getWarmthColor(t1);
+            bar1.style.background = color1;
+            bar1.style.boxShadow = `0 0 20px ${color1.replace('rgb', 'rgba').replace(')', ', 0.5)')}`;
+          }
+
+          if (bar2) {
+            bar2.style.width = `${t2}%`;
+            const color2 = getWarmthColor(t2);
+            bar2.style.background = color2;
+            bar2.style.boxShadow = `0 0 20px ${color2.replace('rgb', 'rgba').replace(')', ', 0.5)')}`;
+          }
+          
+          const myTemp = isSova ? t1 : t2;
+          const frostOverlay = document.getElementById('frost-overlay');
+          if (frostOverlay) {
+            if (myTemp < 30) {
+              frostOverlay.classList.add('active');
+              const targetOpacity = Math.max(0.3, (30 - myTemp) / 30);
+              frostOverlay.style.opacity = targetOpacity;
+            } else {
+              frostOverlay.classList.remove('active');
+              frostOverlay.style.opacity = 0;
+            }
+          }
+          const containerEl = document.getElementById('level2-container');
+          if (containerEl) {
+            containerEl.classList.toggle('low-warmth', myTemp < 30);
+          }
         }
-      }
-      document.getElementById('game-root').classList.toggle('low-warmth', myTemp < 30);
-    }
 
-    // 2. Výpočet času přežití
-    if (data.startTime) {
-      levelStartTime = data.startTime;
-      const elapsed = Math.floor((Date.now() - levelStartTime) / 1000);
-      timerEl.textContent = `Přežijte: ${Math.max(0, 120 - elapsed)}s`;
-      
-      updateWeatherUI(elapsed);
-      
-      if (elapsed >= 120 && isSova && instructionsDismissed) {
-        handleSuccess(db, pairId);
-      }
-    }
+        // 2. Vyhodnocení stavu připravenosti a instrukcí
+        const myReadyKey = isSova ? 'player1' : 'player2';
+        const amIReady = data.ready && data.ready[myReadyKey];
+        const ready1 = data.ready && data.ready.player1;
+        const ready2 = data.ready && data.ready.player2;
+        const bothReady = ready1 && ready2;
+        const isGameRunning = !!data.startTime;
 
-    // 3. Detekce resetu hry přes resetCount
-    if (data.resetCount !== undefined) {
-      if (instructionsDismissed && lastKnownResetCount !== null && data.resetCount > lastKnownResetCount) {
-        showResetOverlay();
-      }
-      lastKnownResetCount = data.resetCount;
-    }
+        if (!instructionsShown) {
+          instructionsShown = true;
+          if (amIReady || isGameRunning) {
+            instructionsDismissed = true;
+            if (!isGameRunning) {
+              showWaitingOverlay();
+            }
+          } else {
+            const title = `${myAnimal} (Teplotní strážce)`;
+            const text = `Tvoje role v této úrovni: <strong style='color: ${isSova ? "var(--sova-color, #3498db)" : "var(--rys-color, #e67e22)"}; font-size: 1.3rem;'>${myAnimal}</strong>.<br><br>` +
+              `Ocitli jste se v mrazivé mlze, která vám postupně ubírá teplo. Uprostřed obrazovky vidíte své teplotní bary.<br><br>` +
+              `Pouze držitel krystalu se zahřívá, zatímco druhý hráč mrzne. **Musíte si krystal střídat** klikáním na tlačítko tak, aby nikdo z vás nezmrzl (teplota nesmí klesnout na 0).<br><br>` +
+              `Pokud začínáte mrznout, klikněte na tlačítko <em>Mrznu! Potřebuji teplo!</em>, které upozorní tvého parťáka <strong>${partnerAnimal}</strong>. Musíte spolu vydržet 120 sekund.`;
 
-    // 4. Zpracování nouzových signálů
-    if (data.signal && role === data.crystalHolder && instructionsDismissed) {
-      flashSignal();
-      set(ref(db, `rooms/${pairId}/actions/level2_warmth/signal`), null);
-    }
+            showInstructionsModal(title, text, () => {
+              const updates = {};
+              updates[`ready/${myReadyKey}`] = true;
+              update(levelRef, updates);
+            });
+          }
+        } else {
+          // Instrukce již byly zpracovány v rámci této relace
+          if (bothReady || isGameRunning) {
+            hideWaitingOverlay();
+            instructionsDismissed = true;
+            
+            // Sova nastaví startovní čas, pokud ještě neběží
+            if (isSova && !data.startTime) {
+              update(levelRef, { startTime: serverTimestamp() });
+            }
+          } else if (amIReady) {
+            showWaitingOverlay();
+          }
+        }
 
-    // 5. Správa ovládacích prvků a časovače mrazu
-    updateHolderUI(data.crystalHolder, role, controlsEl, crystalStatusEl, levelRef, db, pairId);
-    if (instructionsDismissed) {
-      manageWarmthInterval(data.crystalHolder, role, db, pairId);
+        // 3. Výpočet času přežití (pouze pokud hra běží)
+        if (data.startTime) {
+          levelStartTime = data.startTime;
+          const elapsed = Math.floor((Date.now() - levelStartTime) / 1000);
+          timerEl.textContent = `Přežijte: ${Math.max(0, 120 - elapsed)}s`;
+          
+          updateWeatherUI(elapsed);
+          
+          if (elapsed >= 120 && isSova && instructionsDismissed && !levelFinished) {
+            levelFinished = true;
+            handleSuccess(db, pairId);
+          }
+        } else {
+          timerEl.textContent = `Přežijte: 120s`;
+          const weatherStatusEl = document.getElementById('weather-status');
+          if (weatherStatusEl) {
+            weatherStatusEl.textContent = '❄️ Čekání na spuštění hry...';
+            weatherStatusEl.className = 'phase-1';
+          }
+        }
+
+        // 4. Detekce resetu hry přes resetCount
+        if (data.resetCount !== undefined) {
+          if (instructionsDismissed && lastKnownResetCount !== null && data.resetCount > lastKnownResetCount && !levelFinished) {
+            showResetOverlay();
+          }
+          lastKnownResetCount = data.resetCount;
+        }
+
+        // 5. Zpracování nouzových signálů
+        if (data.signal && role === data.crystalHolder && instructionsDismissed) {
+          flashSignal();
+          set(ref(db, `rooms/${pairId}/actions/level2_warmth/signal`), null);
+        }
+
+        // 6. Správa ovládacích prvků a časovače mrazu
+        updateHolderUI(data.crystalHolder, role, controlsEl, crystalStatusEl, levelRef, db, pairId);
+        
+        // Interval teploměru běží pouze pokud hra odstartovala (oběma ready nebo nastaveným startTime)
+        if (instructionsDismissed && (bothReady || isGameRunning)) {
+          manageWarmthInterval(data.crystalHolder, role, db, pairId);
+        } else {
+          if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+        }
+      });
     }
   });
 
@@ -173,6 +319,11 @@ export function initLevel2(db, pairId, role, animal) {
     if (amIHolder && !intervalId) {
       // Jsem držitel: každou vteřinu počítám změnu a zapisuji do DB
       intervalId = setInterval(() => {
+        if (levelFinished) {
+          clearInterval(intervalId);
+          intervalId = null;
+          return;
+        }
         let t1 = currentTemps.player1;
         let t2 = currentTemps.player2;
 
@@ -192,7 +343,14 @@ export function initLevel2(db, pairId, role, animal) {
         }
 
         if (t1 <= 0 || t2 <= 0) {
-          handleFailure(db, pairId);
+          if (!levelFinished) {
+            get(ref(db, `rooms/${pairId}/state`)).then(stateSnap => {
+              const currentState = stateSnap.val() || 'level1';
+              if (currentState === 'level2' && !levelFinished) {
+                handleFailure(db, pairId);
+              }
+            });
+          }
         } else {
           update(ref(db, `rooms/${pairId}/actions/level2_warmth/temperatures`), { player1: t1, player2: t2 });
         }
@@ -214,6 +372,22 @@ function updateHolderUI(holder, role, controlsEl, statusEl, levelRef, db, pairId
   const crystalContainer = document.getElementById('crystal-svg-container');
   if (crystalContainer) {
     crystalContainer.className = `crystal-svg-container holder-${holder}`;
+  }
+
+  // Aktualizace tříd pro avatary držitele / mrznoucího
+  const avatar1 = document.getElementById('crystal-avatar-player1');
+  const avatar2 = document.getElementById('crystal-avatar-player2');
+  if (avatar1 && avatar2) {
+    if (holder === 'player1') {
+      avatar1.className = 'crystal-avatar player1-avatar active-holder';
+      avatar2.className = 'crystal-avatar player2-avatar freezing-holder';
+    } else if (holder === 'player2') {
+      avatar1.className = 'crystal-avatar player1-avatar freezing-holder';
+      avatar2.className = 'crystal-avatar player2-avatar active-holder';
+    } else {
+      avatar1.className = 'crystal-avatar player1-avatar';
+      avatar2.className = 'crystal-avatar player2-avatar';
+    }
   }
 
   // Spustíme bublinky pro ohřívajícího se hráče
@@ -440,7 +614,9 @@ function showResetOverlay() {
 }
 
 function handleSuccess(db, pairId) {
-  set(ref(db, `rooms/${pairId}/state`), 'level3');
+  set(ref(db, `rooms/${pairId}/actions/level3_truth`), null).then(() => {
+    set(ref(db, `rooms/${pairId}/state`), 'level3');
+  });
 }
 
 function getWarmthColor(percent) {
@@ -487,5 +663,59 @@ function getWarmthRates(elapsed) {
     return { loss: 4, gain: 4 };
   } else {
     return { loss: 7, gain: 5 };
+  }
+}
+
+function showWaitingOverlay() {
+  const old = document.getElementById('waiting-overlay');
+  if (old) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'waiting-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 15, 25, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-family: 'Fredoka', 'Segoe UI', sans-serif;
+  `;
+  overlay.innerHTML = `
+    <div style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 24px; padding: 2.5rem; max-width: 450px; width: 90%; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.3); backdrop-filter: blur(10px);">
+      <div class="waiting-spinner" style="margin: 0 auto 1.5rem auto; width: 50px; height: 50px; border: 5px solid rgba(255,255,255,0.1); border-top: 5px solid #00d2ff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+      <h2 style="color: #fff; margin: 0 0 1rem 0; font-size: 1.8rem;">Čekání na parťáka...</h2>
+      <p style="font-size: 1.1rem; line-height: 1.5; color: #dfd5f0; margin: 0;">
+        Hra se spustí, jakmile tvůj parťák potvrdí, že také rozumí zadání.
+      </p>
+    </div>
+  `;
+
+  if (!document.getElementById('waiting-overlay-styles')) {
+    const s = document.createElement('style');
+    s.id = 'waiting-overlay-styles';
+    s.innerHTML = `
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(s);
+  }
+
+  document.body.appendChild(overlay);
+}
+
+function hideWaitingOverlay() {
+  const overlay = document.getElementById('waiting-overlay');
+  if (overlay) {
+    overlay.remove();
   }
 }

@@ -19,8 +19,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
-// Questions array (temporary storage in memory)
-let questionsArray = [];
 let studentProfiles = [];
 let studentPairs = [];
 let availableAvatars = [];
@@ -166,138 +164,6 @@ async function loadStudents() {
   }
 }
 
-
-async function loadQuestions() {
-  try {
-    const user = await new Promise((resolve) => {
-      if (auth.currentUser) {
-        return resolve(auth.currentUser);
-      }
-      const unsubscribe = auth.onAuthStateChanged((currentUser) => {
-        unsubscribe();
-        resolve(currentUser);
-      });
-    });
-
-    if (!user) {
-      throw new Error('Uživatel není přihlášen');
-    }
-
-    const idToken = await user.getIdToken();
-    const response = await fetch(`${SAVE_DATA_URL}?type=questions`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${idToken}`
-      }
-    });
-
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.message || 'Chyba při načítání otázek');
-    }
-    questionsArray = Array.isArray(result.data) ? result.data : [];
-    renderQuestions();
-  } catch (err) {
-    console.warn('loadQuestions error', err);
-    showMessage('questionsMessage', err.message, 'error');
-  }
-}
-
-function addQuestion() {
-  const text = document.getElementById('questionText').value.trim();
-  const optionA = document.getElementById('optionA').value.trim();
-  const optionB = document.getElementById('optionB').value.trim();
-  const optionC = document.getElementById('optionC').value.trim();
-  const correctOption = document.getElementById('correctOption').value;
-
-  if (!text || !optionA || !optionB || !optionC || !correctOption) {
-    showMessage('questionsMessage', 'Prosím, vyplňte všechna pole', 'error');
-    return;
-  }
-
-  const question = {
-    text,
-    options: { A: optionA, B: optionB, C: optionC },
-    correctOption
-  };
-
-  questionsArray.push(question);
-  
-  // Clear form
-  document.getElementById('questionText').value = '';
-  document.getElementById('optionA').value = '';
-  document.getElementById('optionB').value = '';
-  document.getElementById('optionC').value = '';
-  document.getElementById('correctOption').value = '';
-
-
-  // After adding to local array, save the entire array to DB
-  saveQuestions();
-}
-
-function renderQuestions() {
-  const container = document.getElementById('questionsList');
-  if (questionsArray.length === 0) {
-    container.style.display = 'none';
-    return;
-  }
-
-  container.style.display = 'block';
-  container.innerHTML = `<h3>Otázky k uložení (${questionsArray.length})</h3>`;
-  
-  questionsArray.forEach((q, idx) => {
-    const html = `
-      <div class="question-item">
-        <p><strong>${idx + 1}. ${q.text}</strong></p>
-        <p>A) ${q.options.A}</p>
-        <p>B) ${q.options.B}</p>
-        <p>C) ${q.options.C}</p>
-        <p><strong>Správná: ${q.correctOption}</strong></p>
-      </div>
-    `;
-    container.innerHTML += html;
-  });
-}
-
-async function saveQuestions() {
-  if (questionsArray.length === 0) {
-    showMessage('questionsMessage', 'Prosím, přidejte alespoň jednu otázku', 'error');
-    return;
-  }
-
-  setButtonLoading('addQuestionBtn', true, '+ Přidat otázku');
-
-  try {
-    const idToken = await auth.currentUser.getIdToken();
-    const response = await fetch(SAVE_DATA_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${idToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ type: 'questions', data: questionsArray })
-    });
-
-    const result = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(result.message || 'Chyba při ukládání');
-    }
-
-    showMessage('questionsMessage', `Otázky uloženy! (celkem: ${questionsArray.length})`, 'success');
-    // No need to clear questionsArray here, as addQuestion just added one and we saved the whole list.
-  } catch (err) {
-    showMessage('questionsMessage', err.message, 'error');
-  } finally {
-    setButtonLoading('addQuestionBtn', false, '+ Přidat otázku');
-  }
-}
-
-function clearQuestions() {
-  questionsArray = [];
-  renderQuestions();
-  showMessage('questionsMessage', 'Otázky vymazány', 'success');
-}
 
 async function resetRooms() {
   const dialog = document.getElementById('resetConfirmDialog');
@@ -797,8 +663,6 @@ export function initializeAdmin() {
   // Registrace posluchačů okamžitě
   document.getElementById('logoutBtn').addEventListener('click', handleLogout);
   document.getElementById('saveStudentsBtn').addEventListener('click', saveStudents);
-  document.getElementById('addQuestionBtn').addEventListener('click', addQuestion);
-  document.getElementById('clearQuestionsBtn').addEventListener('click', clearQuestions);
   document.getElementById('resetRoomsBtn').addEventListener('click', resetRooms);
   document.getElementById('saveProfilesBtn').addEventListener('click', saveProfiles);
   document.getElementById('avatarToggle').addEventListener('contextmenu', (e) => {
@@ -810,8 +674,7 @@ export function initializeAdmin() {
     syncAvatarsFromFile();
   });
 
-  ﻿  loadStudents();
-  loadQuestions();
+  loadStudents();
   loadProfiles();
   loadAvatars();
   setupAvatarGalleryToggle();

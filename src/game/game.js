@@ -1,10 +1,10 @@
-import { ref, onValue, update, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js';
+import { ref, onValue, update, serverTimestamp, get } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js';
 import { initLevel1 } from './level1.js';
 import { initLevel2 } from './level2.js';
 import { initLevel3 } from './level3.js';
 import { initReflection } from './reflection.js';
 
-export function initGameRouter(db, pairId, role, animal) {
+export function initGameRouter(db, pairId, role, animal, avatar) {
   // Posluchač pro překreslení po odhalení identity
   document.addEventListener('uhk-reveal-done', () => {
     initReflection(db, pairId, role, animal);
@@ -22,6 +22,7 @@ export function initGameRouter(db, pairId, role, animal) {
   const playerPath = role === 'player1' ? 'animal1' : 'animal2';
   update(ref(db, `rooms/${pairId}/players/${playerPath}`), {
     animal: animal,
+    avatar: avatar || 'default.svg',
     status: 'online',
     lastSeen: serverTimestamp()
   }).then(() => console.log("Přítomnost hráče uložena do DB."));
@@ -38,20 +39,24 @@ export function initGameRouter(db, pairId, role, animal) {
     switch (state) {
       case 'level1':
         console.log("Spouštím Level 1...");
-        initLevel1(db, pairId, role);
+        initLevel1(db, pairId, role, animal, avatar);
         break;
-      case 'level2':
+      case 'level2': {
         // Před-inicializujeme data pro Level 2 ihned, aby se předešlo race conditions ze starých her
-        if (role === 'player1') {
-          const levelRef = ref(db, `rooms/${pairId}/actions/level2_warmth`);
-          update(levelRef, {
-            crystalHolder: 'player1',
-            'temperatures/player1': 100,
-            'temperatures/player2': 100,
-            startTime: serverTimestamp(),
-            resetCount: 0
-          });
-        }
+        const levelRef = ref(db, `rooms/${pairId}/actions/level2_warmth`);
+        get(levelRef).then((snapshot) => {
+          if (!snapshot.exists() || !snapshot.val() || !snapshot.val().crystalHolder) {
+            update(levelRef, {
+              crystalHolder: 'player1',
+              'temperatures/player1': 100,
+              'temperatures/player2': 100,
+              startTime: null,
+              resetCount: 0,
+              'ready/player1': false,
+              'ready/player2': false
+            });
+          }
+        });
 
         root.innerHTML = `
           <div class="level-transition-card">
@@ -66,11 +71,12 @@ export function initGameRouter(db, pairId, role, animal) {
         setTimeout(() => {
           onValue(ref(db, `rooms/${pairId}/state`), (snap) => {
             if (snap.val() === 'level2') {
-              initLevel2(db, pairId, role, animal);
+              initLevel2(db, pairId, role, animal, avatar);
             }
           }, { onlyOnce: true });
         }, 5000);
         break;
+      }
       case 'level3':
         root.innerHTML = `
           <div class="level-transition-card">

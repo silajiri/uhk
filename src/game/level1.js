@@ -2,16 +2,25 @@ import { ref, set, onValue, update, serverTimestamp } from 'https://www.gstatic.
 
 let localSignalState = { type: null, count: 0 };
 
-export function initLevel1(db, pairId, role) {
+export function initLevel1(db, pairId, role, animal, avatar) {
   const isSova = (role === 'player1');
   console.log(`Inicializace Level 1: Role=${role}, IsSova=${isSova}`);
+
+  let myAnimal = animal || (isSova ? 'Sova' : 'Rys');
+  let myAvatar = avatar || 'default.svg';
+  let partnerAnimal = isSova ? 'Rys' : 'Sova';
+  let partnerAvatar = 'default.svg';
+  let player2Avatar = isSova ? 'default.svg' : myAvatar; // player2 is Rys/Poutník
+  let instructionsShown = false;
+  let renderGridFn = null;
 
   const gameRoot = document.getElementById('game-root');
   gameRoot.innerHTML = `
     <div id="level1-container" class="${isSova ? 'sova-view' : 'rys-view'}">
-      <div class="role-indicator-header" style="text-align: center; margin-bottom: 0.8rem; font-family: 'Fredoka', 'Segoe UI', sans-serif;">
-        <span style="background: var(--primary); color: white; padding: 0.4rem 1.2rem; border-radius: 20px; font-size: 1rem; font-weight: bold; box-shadow: var(--shadow); border: 2px solid rgba(255, 255, 255, 0.1); display: inline-block;">
-          Jsi: ${isSova ? '🦉 SOVA (Navigátor)' : '🐾 RYS (Poutník)'}
+      <div id="level1-role-header" class="role-indicator-header" style="text-align: center; margin-bottom: 0.8rem; font-family: 'Fredoka', 'Segoe UI', sans-serif;">
+        <span style="background: var(--primary); color: white; padding: 0.4rem 1.2rem; border-radius: 20px; font-size: 1rem; font-weight: bold; box-shadow: var(--shadow); border: 2px solid rgba(255, 255, 255, 0.1); display: inline-flex; align-items: center; gap: 8px; justify-content: center;">
+          <img src="assets/avatars/${myAvatar}" alt="Avatar" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid rgba(255,255,255,0.4);" />
+          <span>Jsi: <strong style="color: ${isSova ? 'var(--sova-color, #3498db)' : 'var(--rys-color, #e67e22)'}">${myAnimal}</strong> (${isSova ? 'Navigátor' : 'Poutník'})</span>
         </span>
       </div>
       <div class="level-instructions" style="display: none;"></div>
@@ -26,13 +35,50 @@ export function initLevel1(db, pairId, role) {
   const controlsEl = document.getElementById('controls');
   const signalOverlay = document.getElementById('signal-overlay');
 
-  // Zobrazení instrukcí jako modal ke schválení (vhodné pro pomalu čtoucí žáky)
-  const title = isSova ? "Sova (Navigátor)" : "Rys (Poutník)";
-  const text = "Tvoje role v této úrovni: <strong style='color: " + (isSova ? "var(--sova-color, #3498db)" : "var(--rys-color, #e67e22)") + "; font-size: 1.3rem;'>" + (isSova ? "🦉 SOVA (Navigátor)" : "🐾 RYS (Poutník)") + "</strong>.<br><br>" +
-    (isSova 
-      ? "Vidíš celou mapu lesa i skryté pasti. Tvým úkolem je bezpečně navigovat Rysa (parťáka) do zeleného cíle.<br><br>Pomocí tlačítek ve tvaru šipek mu vysílej signály, kudy má jít, případně ho zastav tlačítkem STOP nebo upozorni na PAST."
-      : "Nacházíš se v absolutní tmě mlžného lesa a vidíš jen svůj svítící bod. Nemůžeš se hýbat sám bez rozmyslu, protože v lese číhají neviditelné pasti!<br><br>Sleduj velké blikající signály od Sovy (parťáka), která má mapu, a pohybuj se šipkami na klávesnici podle jejích rad.");
-  showInstructionsModal(title, text);
+  // Načtení detailů obou hráčů z DB
+  const playersRef = ref(db, `rooms/${pairId}/players`);
+  onValue(playersRef, (snapshot) => {
+    const players = snapshot.val() || {};
+    const p1 = players.animal1 || {};
+    const p2 = players.animal2 || {};
+
+    if (isSova) {
+      if (p2.animal) partnerAnimal = p2.animal;
+      if (p2.avatar) partnerAvatar = p2.avatar;
+      player2Avatar = partnerAvatar;
+    } else {
+      if (p1.animal) partnerAnimal = p1.animal;
+      if (p1.avatar) partnerAvatar = p1.avatar;
+      player2Avatar = myAvatar;
+    }
+
+    // Aktualizace záhlaví
+    const headerEl = document.getElementById('level1-role-header');
+    if (headerEl) {
+      headerEl.innerHTML = `
+        <span style="background: var(--primary); color: white; padding: 0.4rem 1.2rem; border-radius: 20px; font-size: 1rem; font-weight: bold; box-shadow: var(--shadow); border: 2px solid rgba(255, 255, 255, 0.1); display: inline-flex; align-items: center; gap: 8px; justify-content: center;">
+          <img src="assets/avatars/${myAvatar}" alt="Avatar" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid rgba(255,255,255,0.4);" />
+          <span>Jsi: <strong style="color: ${isSova ? 'var(--sova-color, #3498db)' : 'var(--rys-color, #e67e22)'}">${myAnimal}</strong> (${isSova ? 'Navigátor' : 'Poutník'})</span>
+        </span>
+      `;
+    }
+
+    // Zobrazení instrukcí jako modal ke schválení (pouze jednou)
+    if (!instructionsShown) {
+      instructionsShown = true;
+      const title = isSova ? `${myAnimal} (Navigátor)` : `${myAnimal} (Poutník)`;
+      const text = `Tvoje role v této úrovni: <strong style="color: ${isSova ? "var(--sova-color, #3498db)" : "var(--rys-color, #e67e22)"}; font-size: 1.3rem;">${myAnimal} (${isSova ? "Navigátor" : "Poutník"})</strong>.<br><br>` +
+        (isSova 
+          ? `Vidíš celou mapu lesa i skryté pasti. Tvým úkolem je bezpečně navigovat <strong>${partnerAnimal}</strong> (parťáka) do zeleného cíle.<br><br>Pomocí tlačítek ve tvaru šipek mu vysílej signály, kudy má jít, případně ho zastav tlačítkem STOP nebo upozorni na PAST.`
+          : `Nacházíš se v absolutní tmě mlžného lesa a vidíš jen svůj svítící bod. Nemůžeš se hýbat sám bez rozmyslu, protože v lese číhají neviditelné pasti!<br><br>Sleduj velké blikající signály od <strong>${partnerAnimal}</strong> (parťáka), která má mapu, a pohybuj se šipkami na klávesnici podle jejích rad.`);
+      showInstructionsModal(title, text);
+    }
+
+    // Pokud je již spuštěný render mřížky, vynutíme překreslení kvůli novému avataru na mřížce
+    if (renderGridFn && currentPos) {
+      renderGridFn(currentPos);
+    }
+  });
 
   if (isSova) {
     controlsEl.innerHTML = `
@@ -89,8 +135,10 @@ export function initLevel1(db, pairId, role) {
   onValue(levelRef, (snapshot) => {
     const data = snapshot.val();
     
-    const hasInvalidPath = data && data.map && data.startPos && data.goalPos &&
-      !hasPathBFS(data.map, data.startPos.x, data.startPos.y, data.goalPos.x, data.goalPos.y);
+    const pathLength = (data && data.map && data.startPos && data.goalPos)
+      ? getShortestPathLengthBFS(data.map, data.startPos.x, data.startPos.y, data.goalPos.x, data.goalPos.y)
+      : -1;
+    const hasInvalidPath = pathLength < 15;
 
     if (!data || !data.map || hasInvalidPath) {
       if (isSova) {
@@ -139,11 +187,22 @@ export function initLevel1(db, pairId, role) {
           
           if (currentPos.x === x && currentPos.y === y) {
             cell.classList.add('player-node');
+            const img = document.createElement('img');
+            img.src = `assets/avatars/${player2Avatar}`;
+            img.style.cssText = `
+              width: 100%;
+              height: 100%;
+              border-radius: 50%;
+              object-fit: cover;
+              display: block;
+            `;
+            cell.appendChild(img);
           }
           gridEl.appendChild(cell);
         }
       }
     }
+    renderGridFn = renderGrid;
 
     if (!isSova) {
       window.onkeydown = (e) => {
@@ -158,7 +217,7 @@ export function initLevel1(db, pairId, role) {
           const targetTile = LEVEL1_MAP[nextY][nextX];
           if (targetTile !== 1) { // 1 = zeď
             if (targetTile === 2) { // 2 = past
-              handleCollision(db, pairId, startPos);
+              handleCollision(db, pairId, startPos, myAnimal);
             } else {
               set(ref(db, `rooms/${pairId}/playerPosition`), { x: nextX, y: nextY });
             }
@@ -176,7 +235,9 @@ export function initLevel1(db, pairId, role) {
       if (pos.x === goalPos.x && pos.y === goalPos.y && !isTransitioning) {
         isTransitioning = true;
         if (!isSova) window.onkeydown = null;
-        set(ref(db, `rooms/${pairId}/state`), 'level2');
+        set(ref(db, `rooms/${pairId}/actions/level2_warmth`), null).then(() => {
+          set(ref(db, `rooms/${pairId}/state`), 'level2');
+        });
       }
     });
 
@@ -192,32 +253,33 @@ export function initLevel1(db, pairId, role) {
       const collision = snapshot.val();
       if (collision) {
         if (!isSova) {
-          showCollisionModal(collision.message);
+          showCollisionModal(collision.message, myAnimal);
         }
       }
     });
   }
 }
 
-// Procedurální generátor náhodné mapy s garantovanou cestou ze startu do cíle
+// Procedurální generátor náhodné mapy s garantovanou cestou ze startu do cíle (min. 15 kroků)
 function generateLevel1Data() {
   const width = 10;
   const height = 10;
   
-  // 1. Výběr náhodného startu a cíle s Manhattan vzdáleností alespoň 6
   let startX, startY, goalX, goalY;
-  do {
-    startX = Math.floor(Math.random() * width);
-    startY = Math.floor(Math.random() * height);
-    goalX = Math.floor(Math.random() * width);
-    goalY = Math.floor(Math.random() * height);
-  } while (Math.abs(startX - goalX) + Math.abs(startY - goalY) < 6);
-
-  let map;
   let attempts = 0;
+  let map;
   
-  while (attempts < 1000) {
+  while (attempts < 5000) {
     attempts++;
+    
+    // Generování startu a cíle s Manhattan vzdáleností alespoň 10 pro větší šanci na dlouhou cestu
+    do {
+      startX = Math.floor(Math.random() * width);
+      startY = Math.floor(Math.random() * height);
+      goalX = Math.floor(Math.random() * width);
+      goalY = Math.floor(Math.random() * height);
+    } while (Math.abs(startX - goalX) + Math.abs(startY - goalY) < 10);
+
     map = Array.from({ length: height }, () => Array(width).fill(0));
     
     // Umístění zhruba 24 náhodných zdí
@@ -244,8 +306,9 @@ function generateLevel1Data() {
       trapsPlaced++;
     }
 
-    // Kontrola průchodnosti zdi pomocí BFS
-    if (hasPathBFS(map, startX, startY, goalX, goalY)) {
+    // Kontrola délky nejkratší cesty pomocí BFS (požadujeme alespoň 15 kroků)
+    const pathLength = getShortestPathLengthBFS(map, startX, startY, goalX, goalY);
+    if (pathLength >= 15) {
       break;
     }
   }
@@ -257,10 +320,10 @@ function generateLevel1Data() {
   };
 }
 
-function hasPathBFS(map, sx, sy, gx, gy) {
+function getShortestPathLengthBFS(map, sx, sy, gx, gy) {
   const width = 10;
   const height = 10;
-  const queue = [[sx, sy]];
+  const queue = [[sx, sy, 0]];
   const visited = Array.from({ length: height }, () => Array(width).fill(false));
   visited[sy][sx] = true;
 
@@ -268,8 +331,8 @@ function hasPathBFS(map, sx, sy, gx, gy) {
   const dy = [-1, 1, 0, 0];
 
   while (queue.length > 0) {
-    const [x, y] = queue.shift();
-    if (x === gx && y === gy) return true;
+    const [x, y, dist] = queue.shift();
+    if (x === gx && y === gy) return dist;
 
     for (let i = 0; i < 4; i++) {
       const nx = x + dx[i];
@@ -278,12 +341,12 @@ function hasPathBFS(map, sx, sy, gx, gy) {
       if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
         if (!visited[ny][nx] && map[ny][nx] === 0) { // 0 = volná cesta (bez zdí i pastí)
           visited[ny][nx] = true;
-          queue.push([nx, ny]);
+          queue.push([nx, ny, dist + 1]);
         }
       }
     }
   }
-  return false;
+  return -1;
 }
 
 function showSignalOverlay(type, count, el) {
@@ -294,9 +357,10 @@ function showSignalOverlay(type, count, el) {
   setTimeout(() => el.classList.remove('active'), 1500);
 }
 
-function handleCollision(db, pairId, startPos) {
+function handleCollision(db, pairId, startPos, myAnimal) {
+  const name = myAnimal || "Poutník";
   const collisionData = {
-    message: "⚠️ Pád do pasti! Rys narazil na neviditelnou překážku a vrací se na začátek lesa.",
+    message: `⚠️ Pád do pasti! ${name} narazil na neviditelnou překážku a vrací se na začátek lesa.`,
     timestamp: serverTimestamp()
   };
   set(ref(db, `rooms/${pairId}/actions/level1_darkness/collision`), collisionData);
@@ -349,9 +413,10 @@ function showInstructionsModal(title, text) {
   }
 }
 
-function showCollisionModal(text) {
+function showCollisionModal(text, myAnimal) {
   const old = document.getElementById('collision-modal');
   if (old) return;
+  const name = myAnimal || "Poutník";
 
   const overlay = document.createElement('div');
   overlay.id = 'collision-modal';
@@ -374,7 +439,7 @@ function showCollisionModal(text) {
       <div style="font-size: 4rem; margin-bottom: 1rem;">⚠️</div>
       <h2 style="color: var(--error); margin: 0 0 1rem 0; font-size: 1.6rem;">Pozor! Pád do pasti!</h2>
       <p style="font-size: 1.15rem; line-height: 1.6; margin: 0 0 2rem 0; color: var(--text);">
-        Rys narazil na neviditelnou překážku a vrací se na začátek lesa. Sledujte pozorně navigaci!
+        ${name} narazil na neviditelnou překážku a vrací se na začátek lesa. Sledujte pozorně navigaci!
       </p>
       <button id="btn-dismiss-collision" class="btn-crystal" style="background: var(--error); color: white; border: none; padding: 1rem 2.5rem; font-size: 1.2rem; cursor: pointer; width: 100%;">
         🏃 Rozumím, zkusit znovu

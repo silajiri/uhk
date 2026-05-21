@@ -130,15 +130,12 @@ Pokud mrznoucí hráč klikne na *„Mrznu!“*, zapíše se signál do DB. Na o
   - `🔴 Poslat lež` – Vygeneruje zfalšovaný kód (písmena se náhodně zamění, ale formát pomlček zůstane zachován) a odešle jej.
 - V pravém boxu **„Úlomek parťáka“** svítí otazníky `???`, dokud parťák neprovede sdílení.
 
-### B. Algoritmus sdílení, detektor lži a dešifrování
+### B. Algoritmus sdílení a přímé zobrazení
 1. Kód se generuje náhodně z povolených znaků `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 2. Sova vidí fragment složený z prvních dvou znaků (např. `AB---`), Rys vidí fragment s posledními třemi znaky (např. `--CDE`).
 3. Po stisknutí jednoho z tlačítek se zapíše stav sdílení (`sovaShared` / `rysShared` = `true`), hodnota úlomku (skutečná/falešná) a status pravosti (`sovaShardStatus` / `rysShardStatus` = `'true'` / `'fake'`) do databáze.
-4. Partner po obdržení kódu vidí tlačítko `🔍 Otestovat pravost`. Po kliknutí proběhne 2vteřinová animace skenování.
-5. **Výsledek skenování:**
-   - **Úlomek je pravdivý:** Zobrazí se zelený badge `🟢 Úlomek je pravdivý`.
-   - **Úlomek je falešný!** Zobrazí se červený varovný blikající badge a tlačítko `⚡ Dešifrovat pravdivý kód (15s)`.
-6. **Dešifrování:** Spustí se 15sekundové dešifrování s progress barem. Po dokončení se zobrazí partnerův skutečný fragment, čímž poctivý hráč získá možnost poskládat správný kód i přes partnerovo lhaní.
+4. Jakmile partner sdílí svůj úlomek, zobrazí se okamžitě a bez jakéhokoliv ověřování v boxu „Úlomek parťáka“.
+5. Hráči nemají k dispozici žádný detektor lži ani dešifrování. Zda byl kód správný, zjistí až při pokusu o aktivaci brány. Pokud partner odeslal lež (podvrh), brána se neotevře, pokus se započítá jako neúspěšný a hráči musí komunikovat a vyjednávat.
 
 ### C. Ošetření chyb a limit pokusů
 - Pokud hráč zadá nesprávný kód a odešle jej:

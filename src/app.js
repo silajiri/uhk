@@ -85,7 +85,7 @@ function initGame() {
 
   console.log(`Hra inicializována jako ${userData.animal} (${userData.role})`);
   updateNavbar(userData.role, userData.animal, userData.avatar);
-  initGameRouter(db, userData.pairId, userData.role, userData.animal);
+  initGameRouter(db, userData.pairId, userData.role, userData.animal, userData.avatar);
 }
 
 window.addEventListener('DOMContentLoaded', initGame);
