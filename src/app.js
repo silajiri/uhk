@@ -4,8 +4,9 @@
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js';
 import { getAuth, signOut } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js';
-import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js';
+import { getDatabase, ref, onValue, get } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js';
 import { initGameRouter } from './game/game.js';
+import { showSecretWarningAndTest } from './game/secretWarning.js';
 
 // Použijeme stejnou konfiguraci jako v adminu
 const firebaseConfig = {
@@ -85,7 +86,34 @@ function initGame() {
 
   console.log(`Hra inicializována jako ${userData.animal} (${userData.role})`);
   updateNavbar(userData.role, userData.animal, userData.avatar);
-  initGameRouter(db, userData.pairId, userData.role, userData.animal, userData.avatar);
+
+  const storageKey = `secretTestPassed_${userData.pairId}_${userData.role}`;
+  const localPassed = localStorage.getItem(storageKey) === 'true';
+
+  if (localPassed) {
+    initGameRouter(db, userData.pairId, userData.role, userData.animal, userData.avatar);
+  } else {
+    const playerPath = userData.role === 'player1' ? 'animal1' : 'animal2';
+    const playerRef = ref(db, `rooms/${userData.pairId}/players/${playerPath}/secretTestPassed`);
+
+    get(playerRef).then((snapshot) => {
+      if (snapshot.val() === true) {
+        localStorage.setItem(storageKey, 'true');
+        initGameRouter(db, userData.pairId, userData.role, userData.animal, userData.avatar);
+      } else {
+        showSecretWarningAndTest(db, userData, () => {
+          localStorage.setItem(storageKey, 'true');
+          initGameRouter(db, userData.pairId, userData.role, userData.animal, userData.avatar);
+        });
+      }
+    }).catch((err) => {
+      console.error("Chyba při načítání stavu testu z Firebase:", err);
+      showSecretWarningAndTest(db, userData, () => {
+        localStorage.setItem(storageKey, 'true');
+        initGameRouter(db, userData.pairId, userData.role, userData.animal, userData.avatar);
+      });
+    });
+  }
 }
 
 window.addEventListener('DOMContentLoaded', initGame);
