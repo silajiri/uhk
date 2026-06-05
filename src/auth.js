@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 
 // TODO: Replace these values with your Firebase project configuration.
 const firebaseConfig = {
@@ -23,14 +23,65 @@ function setLoading(isLoading) {
   const loginButton = document.getElementById('loginButton');
   const spinnerRow = document.getElementById('spinner');
 
-  loginButton.disabled = isLoading;
-  spinnerRow.classList.toggle('hidden', !isLoading);
+  if (loginButton) loginButton.disabled = isLoading;
+  if (spinnerRow) spinnerRow.classList.toggle('hidden', !isLoading);
 }
 
 function showMessage(text, type = 'info') {
   const messageEl = document.getElementById('statusMessage');
-  messageEl.textContent = text;
-  messageEl.className = `status-message status-${type}`;
+  if (messageEl) {
+    messageEl.textContent = text;
+    messageEl.className = `status-message status-${type}`;
+  }
+}
+
+async function handleLoginSuccess(user) {
+  const idToken = await user.getIdToken();
+
+  const response = await fetch(FUNCTION_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({})
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || data.status !== 'success') {
+    const errorMessage = data.message || 'Prosím, přihlas se svým školním e-mailem!';
+    throw new Error(errorMessage);
+  }
+
+  if (data.role !== 'admin' && !data.pairId) {
+    throw new Error('Žádný předdefinovaný pár nebyl přiřazen. Kontaktujte učitele.');
+  }
+
+  const userData = {
+    animal: data.animal || '',
+    pairId: data.pairId || '',
+    status: data.status,
+    role: data.role || 'student',
+    avatar: data.avatar || 'default.svg',
+    email: user.email,
+    name: user.displayName,
+    uid: user.uid
+  };
+
+  try {
+    localStorage.setItem('uhkUser', JSON.stringify(userData));
+  } catch (err) {
+    console.warn('localStorage unavailable, storing in memory');
+    sessionStorage.setItem('uhkUser', JSON.stringify(userData));
+  }
+  
+  // Redirect based on role
+  if (data.role === 'admin') {
+    window.location.href = 'admin.html';
+  } else {
+    window.location.href = 'game.html';
+  }
 }
 
 export async function loginWithGoogle() {
@@ -38,53 +89,22 @@ export async function loginWithGoogle() {
   showMessage('', 'info');
 
   try {
-    const result = await signInWithPopup(auth, provider);
-    const user = result.user;
-    const idToken = await user.getIdToken();
-
-    const response = await fetch(FUNCTION_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({})
-    });
-
-    const data = await response.json();
-
-    if (!response.ok || data.status !== 'success') {
-      const errorMessage = data.message || 'Prosím, přihlas se svým školním e-mailem!';
-      throw new Error(errorMessage);
-    }
-
-    if (data.role !== 'admin' && !data.pairId) {
-      throw new Error('Žádný předdefinovaný pár nebyl přiřazen. Kontaktujte učitele.');
-    }
-
-    const userData = {
-      animal: data.animal || '',
-      pairId: data.pairId || '',
-      status: data.status,
-      role: data.role || 'student',
-      avatar: data.avatar || 'default.svg',
-      email: user.email,
-      name: user.displayName,
-      uid: user.uid
-    };
-
+    let result;
     try {
-      localStorage.setItem('uhkUser', JSON.stringify(userData));
-    } catch (err) {
-      console.warn('localStorage unavailable, storing in memory');
-      sessionStorage.setItem('uhkUser', JSON.stringify(userData));
-    }
-    
-    // Redirect based on role
-    if (data.role === 'admin') {
-      window.location.href = 'admin.html';
-    } else {
-      window.location.href = 'game.html';
+      result = await signInWithPopup(auth, provider);
+      if (result && result.user) {
+        await handleLoginSuccess(result.user);
+      }
+    } catch (popupError) {
+      if (popupError.code === 'auth/popup-blocked' || popupError.message?.includes('popup')) {
+        console.warn('Popup blocked, falling back to redirect...');
+        showMessage('Vyskakovací okno zablokováno. Přesměrovávám na přihlášení...', 'info');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await signInWithRedirect(auth, provider);
+        return;
+      } else {
+        throw popupError;
+      }
     }
   } catch (error) {
     const message = /school|školní|edu/i.test(error.message)
@@ -93,14 +113,32 @@ export async function loginWithGoogle() {
 
     showMessage(message, 'error');
     console.error('Login error:', error);
-  } finally {
     setLoading(false);
   }
 }
 
-export function initializeLogin() {
+export async function initializeLogin() {
   const loginButton = document.getElementById('loginButton');
-  loginButton.addEventListener('click', () => {
-    loginWithGoogle();
-  });
+  if (loginButton) {
+    loginButton.addEventListener('click', () => {
+      loginWithGoogle();
+    });
+  }
+
+  // Check if we have a redirect result on page load
+  try {
+    const result = await getRedirectResult(auth);
+    if (result && result.user) {
+      setLoading(true);
+      showMessage('Přihlašování dokončeno, načítám herní data...', 'info');
+      await handleLoginSuccess(result.user);
+    }
+  } catch (error) {
+    console.error('Redirect result error:', error);
+    const message = /school|školní|edu/i.test(error.message)
+      ? 'Prosím, přihlas se svým školním e-mailem!'
+      : error.message || 'Chyba při dokončení přihlášení.';
+    showMessage(message, 'error');
+    setLoading(false);
+  }
 }
