@@ -12,6 +12,8 @@ Tento soubor obsahuje věci, které nejsou přímo v kódu, ale musí být dodr�
 
 ## 3. Psychologické bezpečí
 - Veškeré texty z reflexe musí být konstruovány tak, aby podporovaly pozitivní interakce.
+- **Důležité u Levelu 3:** Hra v Levelu 3 záměrně vystavuje žáky tlaku a umožňuje posílat "hate" a "výsměch" (😂). Po skončení hry v reflexi **musí být jasně zdůrazněno**, že se jednalo pouze o hru a žáci jsou v bezpečí své reálné třídy, aby se předešlo případné stigmatizaci.
+- Pokud si žáci pomáhali, hra je ocení statusem *„Strážci souznění 🌟“* – toto pozitivní chování by měl učitel při společné reflexi vyzdvihnout.
 - Nezobrazovat citlivé komentáře veřejně; anonymní vzkazy zůstávají anonymní a učitel by měl mít možnost je filtrovat.
 - Vždy poskytnout konstruktivní vodítka pro reflexi, ne hodnocení.
 
@@ -27,8 +29,9 @@ Tento soubor obsahuje věci, které nejsou přímo v kódu, ale musí být dodr�
 ## 5. Admin workflow (krátké instrukce)
 - **Import profilů:** Učitel nahraje seznam třídy (formát: `email;jméno;avatar;zvíře`).
 - **Tvorba párů:** Učitel definuje dvojice jednoduše pomocí jmen (formát: `Jméno1;Jméno2`).
+- **Nastavení mostu:** Učitel může v administraci nakonfigurovat velikost šachovnice (N), dobu ukázky cesty (T) a počet pochozích dlaždic (K). Nastavení se automaticky propíše do místností.
 - Při problému s konektivitou: učitel může v dashboardu přepnout místnost do režimu "paused" nebo restartovat místnost.
-- Před odhalením identity musí učitel explicitně stisknout tlačítko "Spustit reflexi".
+- Před odhalením identity musí učitel explicitně stisknout tlačítko "Odemknout reflexi pro všechny" nebo přepnout reflexi u konkrétní místnosti.
 
 ## 6. Bezpečnost a nasazení
 - Žádné API klíče nebo `.env` soubory v repozitáři – použít systém tajemství CI/CD.

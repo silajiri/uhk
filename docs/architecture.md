@@ -1,4 +1,5 @@
 # Architektura a technické specifikace
+## Revize: Verze 4.0 – Aktuální stav projektu
 
 Tento dokument obsahuje technické detaily, které jsou specifické pro implementaci hry Strážci světla:
 
@@ -17,8 +18,9 @@ Firebase Realtime Database je jediným zdrojem pravdy pro aktuální stav místn
 Stavy místnosti (`state`):
 - `level1` – asymetrická navigace v temném lese (Sova naviguje, Rys se slepě pohybuje)
 - `level2` – sdílení krystalu tepla po dobu 120s
-- `level3` – zadání 5místné brány pravdy ze sdílených úlomků
-- `reflection` – závěrečná reflexe a real-time chat po odmaskování
+- `level3` – Skleněný most (paměťový přechod mostu N x N s reakcemi pod tlakem a nucenou finální reakcí)
+- `level4` – zadání 5místné brány pravdy ze sdílených úlomků (původní level3)
+- `reflection` – závěrečná reflexe a real-time chat po odmaskování (odemyká učitel)
 
 Klientská logika:
 - **Matchmaking:** Probíhá přes Google Workspace přihlášení. Klientský kód zavolá HTTPS Cloud Function `lookupMappingByEmail` na `https://europe-west1-uhk-game.cloudfunctions.net/lookupMappingByEmail`. Funkce bezpečně dohledá e-mail ve `/profiles` a `/mappings` a vrátí payload s `pairId`, zvířetem (`animal`), rolí (`player1`/`player2`), avatarem a skutečným jménem.
@@ -62,8 +64,15 @@ Skutečné rozvržení Realtime Database:
   },
   "questions": [],
   "rooms": {
+    "globalConfig": {
+      "level3_bridge": {
+        "gridSize": 5,
+        "previewTime": 5,
+        "tileCount": 7
+      }
+    },
     "pair_1716260000_1": {
-      "state": "level1" | "level2" | "level3" | "reflection",
+      "state": "level1" | "level2" | "level3" | "level4" | "reflection",
       "playerPosition": {
         "x": 0,
         "y": 0
@@ -92,6 +101,13 @@ Skutečné rozvržení Realtime Database:
         "animal2": {
           "name": "Petr Svoboda",
           "avatar": "elephant.svg"
+        }
+      },
+      "config": {
+        "level3_bridge": {
+          "gridSize": 5,
+          "previewTime": 5,
+          "tileCount": 7
         }
       },
       "actions": {
@@ -123,13 +139,51 @@ Skutečné rozvržení Realtime Database:
           "resetCount": 0,
           "signal": "FREEZING" | null
         },
-        "level3_truth": {
+        "level3_bridge": {
+          "activePlayer": "player1" | "player2",
+          "targetTiles": [2, 7, 12, 13, 18, 19, 24],
+          "attempts": 0,
+          "correctSelections": [2, 7],
+          "lastInteraction": {
+            "sender": "player2",
+            "type": "support" | "hate",
+            "text": "Povzbudit 💪",
+            "timestamp": 1716260080000
+          },
+          "finalReaction": {
+            "sender": "player2",
+            "choice": "support" | "hate",
+            "timestamp": 1716260095000
+          },
+          "stats": {
+            "player1": {
+              "supportSent": 2,
+              "hateSent": 0,
+              "success": true,
+              "attemptsUsed": 1,
+              "finalReactionSent": "support"
+            },
+            "player2": {
+              "supportSent": 1,
+              "hateSent": 1,
+              "success": false,
+              "attemptsUsed": 3,
+              "finalReactionSent": "hate"
+            }
+          },
+          "phase": "preview" | "playing" | "evaluation" | "swapping" | "finished"
+        },
+        "level4_truth": {
           "fullCode": "A7X9K",
           "sovaFragment": "A7---",
           "rysFragment": "--X9K",
           "sovaShared": true,
           "rysShared": true,
-          "attempts": 0
+          "attempts": 0,
+          "escapedPlayers": {
+            "player1": "waiting" | "escaped" | "trapped",
+            "player2": "waiting" | "escaped" | "trapped"
+          }
         }
       },
       "teacherControl": {
@@ -168,26 +222,32 @@ Zajišťují, že běžní žáci nemohou zjistit identitu svého partnera před
 
 ### Level 2: Sdílené teplo
 - **Téma:** Ohleduplnost a střídání zdrojů.
-- **Asymetrie:** Pouze držitel krystalu se zahřívá (+2%/s), druhý mrzne (-4%/s). Musí si krystal střídat.
+- **Asymetrie:** Pouze držitel krystalu se zahřívá (+2%/s v první fázi), druhý mrzne (-4%/s). Musí si krystal střídat.
 - **Nouzový signál:** Ne-držitel může vyslat signál "Mrznu!", který vyvolá červený slide-down banner na obrazovce držitele.
 - **Upozornění na selhání:** Pád teploty jednoho z nich na 0 % vyvolá celoobrazovkový modal "Jeden z vás zmrzl!" oznamující restart přežití zpět na začátek (120 sekund).
 
-### Level 3: Kód pravdy
+### Level 3: Skleněný most
+- **Téma:** Podpora vs. Hate, paměť pod tlakem.
+- **Asymetrie:** Hráč A kliká na pochozí dlaždice, které si museli zapamatovat. Hráč B vidí jeho pokrok a posílá mu průběžně povzbuzení či hate a na konci pokusů povinně volí finální hodnocení 👏/😂. Při 3 neúspěších se role a most vymění.
+
+### Level 4: Kód pravdy
 - **Téma:** Pravdomluvnost a sdílení informací.
-- **Asymetrie:** Sova vidí první 2 znaky 5místného kódu, Rys poslední 3 znaky. Každý musí odeslat svůj úlomek druhému.
+- **Asymetrie:** Sova vidí první 2 znaky 5místného kódu, Rys poslední 3 znaky. Každý musí odeslat svůj úlomek druhému (lze poslat pravdivý kód, nebo zradu ve formě lži).
 - **Zámek:** Po 3 neúspěšných pokusech o složení kódu se kód a úlomky v RTDB změní a hráčům se zobrazí modal "Kód se změnil!".
 
 ### Fáze reflexe (Post-Game)
 - **Čekání:** Hráči čekají, dokud učitel na monitoringu neklikne na "Odemknout reflexi" (nastaví `teacherControl/reflectionUnlocked: true`).
-- **Odmaskování:** Statistický přehled o spáchaných chybách (resetLevel1, attemptsLevel3), stisknutí tlačítka pro odhalení parťáka a CSS 3D otočení karty odkrývající partnerovo skutečné jméno a avatar.
+- **Bezpečí:** Zobrazení jasného panelu zdůrazňujícího psychologické bezpečí třídy a ocenění Strážci souznění 🌟 za vysokou kooperaci na mostě.
+- **Odmaskování:** Statistický přehled, stisknutí tlačítka pro odhalení parťáka a CSS 3D otočení karty odkrývající partnerovo skutečné jméno a avatar.
 - **Závěrečný chat:** Odemčení real-time chatovací bubliny (`reflectionChat`), kde si spolužáci mohou vyměnit zprávy, s viditelnými skutečnými jmény nad zprávami.
 
 ---
 
 ## E. Administrátorské rozhraní (Teacher Dashboard)
 
-Učitelské UI (`admin.html`) slouží pro přípravu a živý monitoring:
+Učitelské UI (`admin.html`) slouží pro přípravu, konfiguraci a živý monitoring:
 1. **Import dat:** Umožňuje importovat profily studentů a definovat pevné dvojice studentů. Ukládá data do `/profiles` a `/mappings` přes zabezpečené Cloud Function endpointy.
-2. **Live Monitoring:** Zobrazuje v reálném čase tabulku všech vytvořených místností, jejich stav online/offline (podle presence zvířat) a aktuální herní fázi (Level 1, 2, 3, a Reflexe).
-3. **Globální řízení:** Tlačítko pro odemčení reflexe, které uvolní skutečná jména pro všechny místnosti naráz.
-4. **Manuální restart:** Možnost restartovat konkrétní místnost v případě chyb nebo odpojení žáků.
+2. **Konfigurace Levelu 3:** Nastavení velikosti hrací plochy, času zobrazení a počtu pochozích dlaždic.
+3. **Live Monitoring:** Zobrazuje v reálném čase tabulku všech vytvořených místností, jejich stav online/offline a aktuální herní fázi (Level 1 až 4 a Reflexe).
+4. **Globální řízení:** Tlačítko pro odemčení reflexe, které uvolní skutečná jména pro všechny místnosti naráz.
+5. **Manuální restart:** Možnost restartovat konkrétní místnost v případě chyb nebo odpojení žáků.

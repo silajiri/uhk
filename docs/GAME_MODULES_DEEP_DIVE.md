@@ -1,8 +1,8 @@
 # Dokumentace herních modulů: Strážci světla – Echo v Mlžném lese  
-## Revize: Verze 3.0 – Aktuální stav projektu
+## Revize: Verze 4.0 – Aktuální stav projektu
 
-Tento dokument definuje detailní logiku herních modulů pro 3 úrovně asymetrické kooperace a závěrečnou reflexi. 
-Během samotných herních úrovní (Level 1 až 3) je **zcela eliminován volný textový chat** pro zaručení 100% anonymity. Komunikace je omezena na kontextová tlačítka, vizuální signály a systémové herní akce. 
+Tento dokument definuje detailní logiku herních modulů pro 4 úrovně asymetrické kooperace a závěrečnou reflexi. 
+Během samotných herních úrovní (Level 1 až 4) je **zcela eliminován volný textový chat** pro zaručení 100% anonymity. Komunikace je omezena na kontextová tlačítka, vizuální signály a systémové herní akce. 
 Po dokončení her a odhalení identit v závěrečné fázi reflexe je však **volný real-time chat povolen**, aby se žáci mohli o své zkušenosti podělit a společně ji zhodnotit.
 
 Všechny úrovně také obsahují **instrukční modály s tlačítkem potvrzení přečtení („Přečetl jsem a rozumím“)** na svém začátku, což pomáhá pomalu čtoucím žákům (např. ve 4. třídě) porozumět úkolu před zahájením hry.
@@ -36,7 +36,7 @@ Tento modul zajišťuje bezpečný vstup do hry, kontrolu identity a anonymní p
 4. **Zápis přítomnosti (Presence):** Klient se následně připojí k Realtime Database na cestu `/rooms/{pairId}/players/animal1` (pokud je `player1` / Sova) nebo `animal2` (pokud je `player2` / Rys) a zapíše svůj stav: status: "online", lastSeen: serverTimestamp(), UID a email.
 
 ### C. Podmínky synchronizace a přechodu
-* Klientská aplikace v čekárně spustí aktivní listener (`onValue`) na uzel `/rooms/{pairId}/state`.
+* Klientská aplikace v čekárně spustí active listener (`onValue`) na uzel `/rooms/{pairId}/state`.
 * **Podmínka spuštění:** Jakmile oba hráči zapíšou přítomnost a stav v místnosti se přepne do herního stavu, `initGameRouter` automaticky spustí příslušný level (defaultně `level1`).
 
 ---
@@ -69,7 +69,7 @@ Pokud Rys stoupne na past (hodnota 2):
 1. Pozice hráče se resetuje na startovní pozici.
 2. Hodnota `resetCount` v DB se inkrementuje o 1.
 3. Sově se na 3 sekundy zablokuje navigační pult.
-4. Rysovi se zobrazí modal s chybou *„⚠️ Pád do pasti! Rys narazil na neviditelnou překážku a vrací se na začátek lesa.“*, který musí potvrdit kliknutím na *„🏃 Rozumím, zkusit znovu“*.
+4. Rysovi se zobrazí modal s chybou *„⚠️ Pád do pasti! Rys narazil na neviditelnou překážku a vrací se na začátek lesa.“*, který must potvrdit kliknutím na *„🏃 Rozumím, zkusit znovu“*.
 
 ---
 
@@ -87,7 +87,7 @@ Pokud Rys stoupne na past (hodnota 2):
 - **Vstupní modal:** Před startem je nutné potvrdit instrukce kliknutím na *„👍 Přečetl jsem a rozumím“*.
 
 ### B. Teplotní mechanika a gradient (Zrychlující se úbytek tepla)
-Pro zamezení matematické nemožnosti lineárního úbytku (který při parametrech -4/+2 dělal přežití 120s nemožným) a vytvoření herního tlaku je klima rozděleno do tří fází:
+Pro zamezení matematické nemožnosti lineárního úbytku a vytvoření herního tlaku je klima rozděleno do tří fází:
 1. **0. až 40. sekunda: ❄️ Mírný chlad**
    - Hráč bez krystalu mrzne rychlostí **-2 % za sekundu**.
    - Hráč s krystalem se zahřívá rychlostí **+4 % za sekundu** (netto zisk týmu +2 %/s).
@@ -118,7 +118,33 @@ Pokud mrznoucí hráč klikne na *„Mrznu!“*, zapíše se signál do DB. Na o
 
 ---
 
-## 4.4 Úroveň 3: Kód pravdy (Dilema vězně a Brána pravdy)
+## 4.4 Úroveň 3: Skleněný most (Paměťová cesta)
+
+**Cíl:** Rozpoznání chování a reakcí pod tlakem, vyzkoušení si role podporovatele vs. narušitele / škůdce.
+
+### A. Vizuální rozvržení (UI/UX)
+- **Hrací plocha:** Čtvercová šachovnice o velikosti **N x N** dlaždic (nastavitelná v administraci, např. 5x5).
+- **Zadání (Náhled):** Na začátku levelu se na **T sekund** (např. 5s) oběma hráčům zobrazí hrací pole se zvýrazněním **K pochozích dlaždic** (např. 7). Pozice pochozích dlaždic jsou generovány náhodně. Po vypršení času T se zvýraznění skryje a dlaždice vypadají identicky.
+- **Aktivní Hráč A:** Kliká na dlaždice a snaží se odhalit pochozí cestu. Správné dlaždice se zbarví zeleně, špatné dlaždice bliknou červeně a zresetují celý aktuální pokus. Má 3 pokusy.
+- **Sledující Hráč B:** Sleduje pokrok parťáka v reálném čase. Má k dispozici ovládací pult s tlačítky pro odeslání reakcí:
+  - **Průběžná podpora 👏:** Spustí na obrazovce aktivního hráče povzbuzující animaci (hvězdičky/srdíčka) a text (např. "Super! Jen tak dál!").
+  - **Průběžný hate 😜:** Spustí rušivou animaci (chvění obrazovky, červenou mlhu) a text (např. "To nedáš!").
+- **Finální reakce (👏 vs. 😂):** Na konci pokusů aktivního hráče (ať už úspěchu po označení všech K dlaždic, nebo neúspěchu po vyčerpání 3 pokusů) se hra pozastaví. Pasivnímu hráči se zobrazí povinný modal se dvěma velkými tlačítky: **👏 (Podpora)** a **😂 (Výsměch)**. Hra nepokračuje, dokud jednu možnost nezvolí. Tato volba se zaloguje a zobrazí aktivnímu hráči.
+
+### B. Algoritmická logika a střídání rolí
+1. Generuje se náhodně K dlaždic na poli N x N.
+2. Aktivní hráč hledá dlaždice. Pokud uspěje, po finální reakci partnera hra přechází do Levelu 4.
+3. Pokud aktivní hráč po 3 pokusech neuspěje, po finální reakci se role **obracejí**:
+   - Generuje se **nové náhodné rozložení** K pochozích dlaždic na poli N x N.
+   - Zobrazí se náhled na T sekund.
+   - Hráč B se stává aktivním hledačem (má 3 pokusy).
+   - Hráč A se stává sledujícím a může odesílat reakce.
+   - Na konci pokusů Hráče B se aktivnímu Hráči A zobrazí povinná finální reakce, po jejímž odeslání hra pokračuje do Levelu 4.
+4. Všechny kliky, průběžné interakce (podpory/haty), finální nucené reakce a úspěšnost (`success: true|false`) se ukládají a sčítají v databázi pod `actions/level3_bridge` pro vyhodnocení.
+
+---
+
+## 4.5 Úroveň 4: Kód pravdy (Dilema vězně a Brána pravdy)
 
 **Cíl:** Rozvoj pravdomluvnosti, etického rozhodování, rozpoznání následků zrady vs. spolupráce a asymetrické spolupráce.
 
@@ -133,7 +159,7 @@ Pokud mrznoucí hráč klikne na *„Mrznu!“*, zapíše se signál do DB. Na o
 ### B. Algoritmus sdílení a přímé zobrazení
 1. Kód se generuje náhodně z povolených znaků `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
 2. Sova vidí fragment složený z prvních dvou znaků (např. `AB---`), Rys vidí fragment s posledními třemi znaky (např. `--CDE`).
-3. Po stisknutí jednoho z tlačítek se zapíše stav sdílení (`sovaShared` / `rysShared` = `true`), hodnota úlomku (skutečná/falešná) a status pravosti (`sovaShardStatus` / `rysShardStatus` = `'true'` / `'fake'`) do databáze.
+3. Po stisknutí jednoho z tlačítek se zapíše stav sdílení (`sovaShared` / `rysShared` = `true`), hodnota úlomku (skutečná/falešná) a status pravosti (`sovaShardStatus` / `rysShardStatus` = `'true'` / `'fake'`) do databáze pod `actions/level4_truth`.
 4. Jakmile partner sdílí svůj úlomek, zobrazí se okamžitě a bez jakéhokoliv ověřování v boxu „Úlomek parťáka“.
 5. Hráči nemají k dispozici žádný detektor lži ani dešifrování. Zda byl kód správný, zjistí až při pokusu o aktivaci brány. Pokud partner odeslal lež (podvrh), brána se neotevře, pokus se započítá jako neúspěšný a hráči musí komunikovat a vyjednávat.
 
@@ -152,29 +178,34 @@ Při odeslání správného kódu brána vyhodnotí status hráče:
 
 ---
 
-## 4.5 Modul Post-Game Reflection a Velké odhalení
+## 4.6 Modul Post-Game Reflection a Velké odhalení
 
 Po dokončení brány oběma hráči se stav místnosti přepne do reflexe.
 
 ### A. Učitelská kontrola (Čekání)
-Hráči po vstupu do reflexe vidí čekací obrazovku: **„Čekání na učitele, až odemkne fázi reflexe…“**. (Tento stav je chráněn proti epileptickému problikávání při změnách v databázi).
+Hráči po vstupu do reflexe vidí čekací obrazovku: **„Čekání na učitele, až odemkne fázi reflexe…“**. 
 Teprve když učitel v administraci klikne na tlačítko *„Odemknout reflexi“*, klientské aplikace se přepnou do fáze odmaskování.
 
 ### B. Krok 1: Statistika a spuštění odmaskování
-1. Zobrazí se statistická karta s informacemi o spolupráci (počet pádů v L1, počet neúspěšných pokusů v L3).
+1. Zobrazí se statistická karta s informacemi o spolupráci (pády v L1, statistiky mostu v L3 – počet podpor/hatů a finální reakce, a pokusy v L4).
 2. Hráč vidí, se kterým anonymním zvířetem hrál.
-3. Kliknutím na tlačítko **„🔍 Odhalit skutečné jméno partnera“** se provede 3D otočení karty spolužáka (s podporou 3D paralaxního efektu při pohybu myši) a zasypání obrazovky konfetami.
+3. Kliknutím na tlačítko **„🔍 Odhalit skutečné jméno partnera“** se provede 3D otočení karty spolužáka a zasypání obrazovky konfetami.
 
-### C. Krok 2: Morální vyhodnocení na základě výsledků
+### C. Krok 2: Vzkaz o bezpečí a Ocenění podpory
+* **Ujištění o bezpečí:** V reflexní obrazovce se zobrazí výrazný rámeček s textem:
+  > *„Ať už se během hry v Mlžném lese stalo cokoliv – ať už vám parťák poslal podporu, nebo se vám vysmál – pamatujte, že toto byla jen hra. Nyní jste zpátky v bezpečí své třídy, kde jste parťáci a můžete si o všem otevřeně popovídat.“*
+* **Ocenění podpory:** Pokud si hráči navzájem poslali více podpor než hatů, zobrazí se speciální svítící status: **„Ocenění: Strážci souznění 🌟 – Dokázali jste se podpořit i v těžkých chvílích na mostě!“**
+
+### D. Krok 3: Morální vyhodnocení na základě výsledků brány
 Na základě kombinace stavů `escapedPlayers` se zobrazí barevný morální banner a na míru šitý citát:
-1. **Společné vítězství (oba `escaped`):** Zelený banner `🟢 Společné vítězství!`. Hráči si věřili a oba unikli. Citát vyzdvihuje sílu důvěry a spolupráce.
+1. **Společné vítězství (oba `escaped`):** Zelený banner `🟢 Společné vítězství!`. Hráči si věřili a oba unikli.
 2. **Unikl jsi sám / Byl jsi uvězněn (jeden `escaped`, jeden `trapped`):** 
    - Pro uprchlíka: Modrý banner `⚡ Unikl jsi sám!`. Partner se pokusil o zradu, ale byl bránou polapen.
    - Pro zrádce: Oranžový banner `⚠️ Byl jsi uvězněn bránou!`. Pokusil se oklamat partnera a byl potrestán.
-3. **Vzájemná zrada potrestána (oba `trapped`):** Tmavě červený banner `🚨 Vzájemná zrada potrestána!`. Oba se pokusili oklamat druhého, oba zůstali uvězněni. Poukazuje na to, že vzájemná zrada vede k oboustranné porážce.
+3. **Vzájemná zrada potrestána (oba `trapped`):** Tmavě červený banner `🚨 Vzájemná zrada potrestána!`. Oba se pokusili oklamat druhého, oba zůstali uvězněni.
 
-### D. Krok 3: Závěrečný real-time chat
+### E. Krok 4: Závěrečný real-time chat
 Po odmaskování a zobrazení morálních karet se odemkne chatovací místnost.
 - Zprávy se synchronizují v reálném čase.
-- Partnerovy zprávy jsou jasně nadepsány jeho **skutečným jménem** a zobrazeny v odlišném barevném schématu.
-- Slouží k diskuzi o průběhu hry, sdílení pocitů a vysvětlení motivů chování v Levelu 3.
+- Partnerovy zprávy jsou jasně nadepsány jeho **skutečným jménem**.
+- Slouží k diskuzi o průběhu hry, sdílení pocitů a vysvětlení motivů chování na mostě a u brány.
