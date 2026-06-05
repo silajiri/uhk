@@ -13,7 +13,6 @@ export function initReflection(db, pairId, role, animal) {
   const roomRef = ref(db, `rooms/${pairId}`);
 
   // Nejprve zapíšeme identitu hráče (jméno a avatar) do místnosti, aby ji partner mohl přečíst v odmaskování
-  // Změna souboru pro GIT
   const userData = JSON.parse(localStorage.getItem('uhkUser') || sessionStorage.getItem('uhkUser') || '{}');
   if (userData.name) {
     update(ref(db, `rooms/${pairId}/identities/${myPath}`), {
@@ -30,7 +29,7 @@ export function initReflection(db, pairId, role, animal) {
     const unlocked = room.teacherControl?.reflectionUnlocked || false;
 
     if (!unlocked) {
-      // Zobrazení čekací obrazovky pouze pokud ještě není zobrazená (zabraňuje nepříjemnému blikání)
+      // Zobrazení čekací obrazovky pouze pokud ještě není zobrazená
       if (!root.querySelector('.waiting-reflection')) {
         root.innerHTML = `
           <div class="level-transition-card waiting-reflection">
@@ -66,8 +65,16 @@ export function initReflection(db, pairId, role, animal) {
 
     // Načtení statistik a identit
     const level1Resets = room.actions?.level1_darkness?.resetCount || 0;
-    const level3Attempts = room.actions?.level3_truth?.attempts || 0;
-    const escapedPlayers = room.actions?.level3_truth?.escapedPlayers || { player1: 'waiting', player2: 'waiting' };
+    
+    // Most L3
+    const bridgeData = room.actions?.level3_bridge || {};
+    const bridgeStats = bridgeData.stats || {};
+    const myBridgeStats = role === 'player1' ? (bridgeStats.player1 || {}) : (bridgeStats.player2 || {});
+    const partnerBridgeStats = role === 'player1' ? (bridgeStats.player2 || {}) : (bridgeStats.player1 || {});
+
+    // Kód L4
+    const level4Attempts = room.actions?.level4_truth?.attempts || 0;
+    const escapedPlayers = room.actions?.level4_truth?.escapedPlayers || { player1: 'waiting', player2: 'waiting' };
 
     const partnerIdentity = room.identities?.[partnerPath] || { name: 'Tvůj parťák', avatar: 'default.svg' };
     const partnerAnimal = role === 'player1' ? (room.players?.animal2?.animal || 'Rys') : (room.players?.animal1?.animal || 'Sova');
@@ -77,9 +84,9 @@ export function initReflection(db, pairId, role, animal) {
 
     if (!isRevealed) {
       if (!root.querySelector('.reflection-reveal-card')) {
-        renderRevealScreen(root, partnerAnimal, level1Resets, level3Attempts, partnerIdentity, pairId);
+        renderRevealScreen(root, partnerAnimal, level1Resets, myBridgeStats, partnerBridgeStats, level4Attempts, partnerIdentity, pairId);
       } else {
-        // Pouze aktualizujeme detaily, které mohly dorazit později (např. jméno partnera)
+        // Pouze aktualizujeme detaily, které mohly dorazit později
         const imgEl = root.querySelector('.reflection-card-back img');
         if (imgEl) {
           const newSrc = `assets/avatars/${partnerIdentity.avatar || 'default.svg'}`;
@@ -96,7 +103,7 @@ export function initReflection(db, pairId, role, animal) {
       const avatarPath = `assets/avatars/${partnerIdentity.avatar || 'default.svg'}`;
       let finalCard = document.getElementById('reflection-final-card');
       if (!finalCard) {
-        renderReflectionScreenOuter(root, partnerIdentity, avatarPath, escapedPlayers, role);
+        renderReflectionScreenOuter(root, partnerIdentity, avatarPath, escapedPlayers, role, bridgeStats);
       }
       
       const chatBox = document.getElementById('reflection-chat-box');
@@ -111,25 +118,40 @@ export function initReflection(db, pairId, role, animal) {
   });
 }
 
-function renderRevealScreen(root, partnerAnimal, resets, attempts, partnerIdentity, pairId) {
+function renderRevealScreen(root, partnerAnimal, resets, myBridge, partnerBridge, attempts, partnerIdentity, pairId) {
   const avatarPath = `assets/avatars/${partnerIdentity.avatar || 'default.svg'}`;
   
+  const myBResult = myBridge.success ? '<span style="color:#2ecc71;">Úspěch</span>' : '<span style="color:#e74c3c;">Neúspěch</span>';
+  const partnerBSupport = partnerBridge.supportSent || 0;
+  const partnerBHate = partnerBridge.hateSent || 0;
+  const partnerBFinal = partnerBridge.finalReactionSent === 'support' ? '👏 Podpora' : (partnerBridge.finalReactionSent === 'hate' ? '😂 Výsměch' : '—');
+
   root.innerHTML = `
     <div class="module-card reflection-reveal-card" style="max-width: 650px; text-align: center; animation: fadeIn 0.5s;">
       <div class="module-tag">Fáze: Odhalení</div>
       <h1 style="margin: 1rem 0;">Kdo byl tvým parťákem?</h1>
       <p class="module-description">Společně jste úspěšně zvládli všechny překážky. Zde je přehled vaší spolupráce:</p>
       
-      <div class="stats-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin: 1.5rem 0;">
-        <div style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 16px; border: 1px solid var(--border);">
-          <div style="font-size: 2rem;">🛡️</div>
-          <div style="font-size: 1.2rem; font-weight: 700; color: var(--accent); margin-top: 0.5rem;">${resets}</div>
-          <div class="input-hint">pádů do pasti v Levelu 1</div>
+      <div class="stats-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin: 1.5rem 0;">
+        <div style="background: rgba(255,255,255,0.03); padding: 0.8rem; border-radius: 16px; border: 1px solid var(--border);">
+          <div style="font-size: 1.8rem;">🛡️</div>
+          <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent); margin-top: 0.5rem;">${resets}</div>
+          <div class="input-hint" style="font-size:0.75rem;">pády do pasti (L1)</div>
         </div>
-        <div style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 16px; border: 1px solid var(--border);">
-          <div style="font-size: 2rem;">🔑</div>
-          <div style="font-size: 1.2rem; font-weight: 700; color: var(--accent); margin-top: 0.5rem;">${attempts}</div>
-          <div class="input-hint">neúspěšných pokusů v Levelu 3</div>
+        <div style="background: rgba(255,255,255,0.03); padding: 0.8rem; border-radius: 16px; border: 1px solid var(--border);">
+          <div style="font-size: 1.8rem;">🌉</div>
+          <div style="font-size: 0.95rem; font-weight: 700; color: var(--accent); margin-top: 0.5rem; line-height: 1.3;">
+            Tvůj most: ${myBResult}<br>
+            Podpora od něj: ${partnerBSupport}x<br>
+            Hate od něj: ${partnerBHate}x<br>
+            Reakce: ${partnerBFinal}
+          </div>
+          <div class="input-hint" style="font-size:0.75rem; margin-top:0.3rem;">Skleněný most (L3)</div>
+        </div>
+        <div style="background: rgba(255,255,255,0.03); padding: 0.8rem; border-radius: 16px; border: 1px solid var(--border);">
+          <div style="font-size: 1.8rem;">🔑</div>
+          <div style="font-size: 1.1rem; font-weight: 700; color: var(--accent); margin-top: 0.5rem;">${attempts}</div>
+          <div class="input-hint" style="font-size:0.75rem;">chybné pokusy (L4)</div>
         </div>
       </div>
 
@@ -189,15 +211,12 @@ function renderRevealScreen(root, partnerAnimal, resets, attempts, partnerIdenti
     if (step === 0) {
       step = 1;
       
-      // 3D Otočení a záblesk
       cardInner.classList.add('flipped');
       cardInner.classList.add('card-flash');
       
-      // Zobrazení jména
       nameDisplay.style.height = 'auto';
       nameDisplay.style.opacity = '1';
       
-      // Konfety
       spawnConfetti();
       
       revealBtn.innerHTML = '👍 Pokračovat k chatu a hodnocení';
@@ -247,7 +266,7 @@ function spawnConfetti() {
   }
 }
 
-function renderReflectionScreenOuter(root, partnerIdentity, avatarPath, escapedPlayers, role) {
+function renderReflectionScreenOuter(root, partnerIdentity, avatarPath, escapedPlayers, role, bridgeStats) {
   const myStatus = role === 'player1' ? escapedPlayers.player1 : escapedPlayers.player2;
   const partnerStatus = role === 'player1' ? escapedPlayers.player2 : escapedPlayers.player1;
 
@@ -266,7 +285,7 @@ function renderReflectionScreenOuter(root, partnerIdentity, avatarPath, escapedP
     bannerBorder = "1px solid #2ecc71";
     bannerColor = "#2ecc71";
     bannerIcon = "🟢";
-    dynamicQuote = "<strong>„Důvěra je klíčem k přežití.“</strong> Společnými silami jste se navigovali v absolutní tmě, střídali si hřejivý krystal a nakonec poskládali a sdíleli Kód pravdy. Děkujeme, že jste ukázali, že spolupráce a důvěra dokáží rozehnat jakoukoliv mlhu!";
+    dynamicQuote = "<strong>„Důvěra je klíčem k přežití.“</strong> Společnými silami jste se navigovali v absolutní tmě, střídali si krystal, překročili Skleněný most a nakonec poskládali a sdíleli Kód pravdy. Děkujeme, že jste ukázali, že spolupráce a důvěra dokáží rozehnat jakoukoliv mlhu!";
   } else if (myStatus === 'escaped' && partnerStatus === 'trapped') {
     outcomeTitle = "Unikl jsi sám!";
     outcomeText = "Tvůj partner tě zkusil oklamat a poslal ti falešný úlomek. Starobylá brána však jeho lež odhalila a zablokovala ho. Ty jsi díky své upřímnosti prošel.";
@@ -301,6 +320,18 @@ function renderReflectionScreenOuter(root, partnerIdentity, avatarPath, escapedP
     dynamicQuote = "Společnými silami jste se navigovali v absolutní tmě, střídali si hřejivý krystal a nakonec poskládali a sdíleli kód.";
   }
 
+  // Výpočet ocenění za vzájemnou podporu (Strážci souznění)
+  const p1 = bridgeStats?.player1 || {};
+  const p2 = bridgeStats?.player2 || {};
+  const p1Support = p1.supportSent || 0;
+  const p2Support = p2.supportSent || 0;
+  const p1Hate = p1.hateSent || 0;
+  const p2Hate = p2.hateSent || 0;
+  const p1Coop = p1Support >= p1Hate;
+  const p2Coop = p2Support >= p2Hate;
+  const hasSupports = (p1Support + p2Support) > 0;
+  const isAwarded = p1Coop && p2Coop && hasSupports;
+
   root.innerHTML = `
     <div class="module-card reflection-final-card" id="reflection-final-card" style="max-width: 650px; text-align: center; animation: fadeIn 0.5s;">
       <div class="module-tag" style="background: rgba(46, 204, 113, 0.15); color: #2ecc71;">Fáze: Zpětný pohled</div>
@@ -312,6 +343,28 @@ function renderReflectionScreenOuter(root, partnerIdentity, avatarPath, escapedP
         <h1 style="margin: 0; font-size: 1.8rem;">${partnerIdentity.name}</h1>
         <p style="color: #2ecc71; font-weight: 700; margin: 0; font-size: 1.1rem;">byl tvým herním parťákem!</p>
       </div>
+
+      <!-- Vzkaz o bezpečí třídy -->
+      <div style="background: rgba(52, 152, 219, 0.12); border: 2px solid var(--sova-color, #3498db); border-radius: 16px; padding: 1.2rem; margin-bottom: 1.5rem; text-align: left; box-shadow: 0 4px 15px rgba(52, 152, 219, 0.08);">
+        <h3 style="margin: 0 0 0.5rem 0; font-size: 1.15rem; font-weight: 700; color: var(--sova-color, #3498db); display: flex; align-items: center; gap: 0.5rem;">
+          <span>💙</span> Vzkaz pro vaši třídu:
+        </h3>
+        <p style="margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text);">
+          Ať už se během hry v Mlžném lese stalo cokoliv – ať už vám parťák poslal podporu, nebo se vám vysmál – pamatujte, že toto byla jen hra. Nyní jste zpátky v bezpečí své třídy, kde jste parťáci a můžete si o všem otevřeně popovídat.
+        </p>
+      </div>
+
+      <!-- Ocenění Strážci souznění -->
+      ${isAwarded ? `
+      <div style="background: rgba(241, 196, 15, 0.12); border: 2px solid #f1c40f; border-radius: 16px; padding: 1.2rem; margin-bottom: 1.5rem; text-align: left; box-shadow: 0 4px 15px rgba(241, 196, 15, 0.12);">
+        <h3 style="margin: 0 0 0.5rem 0; font-size: 1.15rem; font-weight: 700; color: #f1c40f; display: flex; align-items: center; gap: 0.5rem;">
+          <span>🌟</span> Ocenění: Strážci souznění
+        </h3>
+        <p style="margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text);">
+          Skvělá práce! Dokázali jste se podpořit i v těžkých chvílích na mostě a pomáhali si překonat strach z chyb. Vaše vzájemná podpora je vzorným příkladem parťáctví!
+        </p>
+      </div>
+      ` : ''}
 
       <!-- Morální vyhodnocení brány -->
       <div style="background: ${bannerBg}; border: ${bannerBorder}; color: ${bannerColor}; border-radius: 16px; padding: 1.2rem; margin-bottom: 1.5rem; text-align: left; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
@@ -346,7 +399,8 @@ function renderReflectionScreenOuter(root, partnerIdentity, avatarPath, escapedP
         Únik z Mlžného lesa © 2026 – Hra pro rozvoj třídního kolektivu
       </div>
     </div>
-  `;}
+  `;
+}
 
 function renderChatMessages(db, pairId, role, chatData, partnerIdentity) {
   const chatBox = document.getElementById('reflection-chat-box');

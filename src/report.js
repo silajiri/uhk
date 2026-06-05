@@ -78,12 +78,12 @@ function getStudentName(email, fallbackAnimal) {
 
 // Perform behavioral analysis of a room
 export function analyzeRoomBehavior(room) {
-  const l3 = room.actions?.level3_truth || {};
-  const sShared = l3.sovaShared || false;
-  const rShared = l3.rysShared || false;
-  const sStatus = l3.sovaShardStatus || ''; // 'true' | 'fake'
-  const rStatus = l3.rysShardStatus || ''; // 'true' | 'fake'
-  const escapedPlayers = l3.escapedPlayers || { player1: 'waiting', player2: 'waiting' };
+  const l4 = room.actions?.level4_truth || {};
+  const sShared = l4.sovaShared || false;
+  const rShared = l4.rysShared || false;
+  const sStatus = l4.sovaShardStatus || ''; // 'true' | 'fake'
+  const rStatus = l4.rysShardStatus || ''; // 'true' | 'fake'
+  const escapedPlayers = l4.escapedPlayers || { player1: 'waiting', player2: 'waiting' };
 
   const sReveal = room.revealDecisions?.player1 || '';
   const rReveal = room.revealDecisions?.player2 || '';
@@ -152,8 +152,8 @@ function updateKPIs(rooms) {
   const totalRooms = roomList.length;
 
   let totalPlayers = 0;
-  let totalL3Choices = 0;
-  let totalL3Coops = 0;
+  let totalL4Choices = 0;
+  let totalL4Coops = 0;
   let totalL1Resets = 0;
   let totalL2WarmthResets = 0;
   let roomsWithL1 = 0;
@@ -177,15 +177,15 @@ function updateKPIs(rooms) {
       roomsWithL2++;
     }
 
-    // L3 behaviors
-    const l3 = room.actions?.level3_truth || {};
-    if (l3.sovaShared) {
-      totalL3Choices++;
-      if (l3.sovaShardStatus === 'true') totalL3Coops++;
+    // L4 behaviors
+    const l4 = room.actions?.level4_truth || {};
+    if (l4.sovaShared) {
+      totalL4Choices++;
+      if (l4.sovaShardStatus === 'true') totalL4Coops++;
     }
-    if (l3.rysShared) {
-      totalL3Choices++;
-      if (l3.rysShardStatus === 'true') totalL3Coops++;
+    if (l4.rysShared) {
+      totalL4Choices++;
+      if (l4.rysShardStatus === 'true') totalL4Coops++;
     }
   });
 
@@ -193,10 +193,10 @@ function updateKPIs(rooms) {
   document.getElementById('kpi-total-rooms').textContent = totalRooms;
   document.getElementById('kpi-total-players').textContent = totalPlayers;
 
-  const coopRate = totalL3Choices > 0 ? Math.round((totalL3Coops / totalL3Choices) * 100) : null;
+  const coopRate = totalL4Choices > 0 ? Math.round((totalL4Coops / totalL4Choices) * 100) : null;
   document.getElementById('kpi-coop-rate').textContent = coopRate !== null ? `${coopRate}%` : 'N/A';
-  document.getElementById('kpi-coop-sub').textContent = totalL3Choices > 0 
-    ? `${totalL3Coops} z ${totalL3Choices} voleb bylo čestných` 
+  document.getElementById('kpi-coop-sub').textContent = totalL4Choices > 0 
+    ? `${totalL4Coops} z ${totalL4Choices} voleb bylo čestných` 
     : 'Žádné volby zatím neproběhly';
 
   const avgL1 = roomsWithL1 > 0 ? (totalL1Resets / roomsWithL1).toFixed(1) : '0.0';
@@ -211,14 +211,15 @@ function getStateLabel(state) {
   switch (state) {
     case 'level1': return 'Level 1 🦉🐾';
     case 'level2': return 'Level 2 ❄️🔥';
-    case 'level3': return 'Level 3 🔒🗝️';
+    case 'level3': return 'Level 3 🌉';
+    case 'level4': return 'Level 4 🔒🗝️';
     case 'reflection': return 'Reflexe 💬✨';
     default: return state || 'level1';
   }
 }
 
-// Generate the visual output of Level 3 player status and decisions
-function renderL3StatusColumn(sName, sChoice, sOutcome, sReveal, rName, rChoice, rOutcome, rReveal) {
+// Generate the visual output of Level 4 player status and decisions
+function renderL4StatusColumn(sName, sChoice, sOutcome, sReveal, rName, rChoice, rOutcome, rReveal) {
   const getChoiceBadge = (choice) => {
     if (choice === 'truth') return '<span class="choice-tag truth">🟢 Pravda</span>';
     if (choice === 'lie') return '<span class="choice-tag lie">🔴 Lež</span>';
@@ -335,10 +336,15 @@ function renderTable() {
           </td>
           <td>
             L1: <span style="font-weight:600; color:${l1Resets > 0 ? 'var(--warning)' : 'var(--success)'}">${l1Resets}x</span><br>
-            L2: <span style="font-weight:600; color:${l2Resets > 0 ? 'var(--warning)' : 'var(--success)'}">${l2Resets}x</span>
+            L2: <span style="font-weight:600; color:${l2Resets > 0 ? 'var(--warning)' : 'var(--success)'}">${l2Resets}x</span><br>
+            <div style="font-size: 0.75rem; margin-top: 0.3rem; border-top: 1px solid rgba(0,0,0,0.08); padding-top: 0.3rem; color: var(--muted); line-height: 1.3;">
+              <strong>Most L3:</strong><br>
+              Sova: ${room.actions?.level3_bridge?.stats?.player1?.success ? '🟢' : (room.actions?.level3_bridge?.stats?.player1?.attemptsUsed !== undefined ? '🔴' : '⏳')} (${room.actions?.level3_bridge?.stats?.player1?.attemptsUsed || 0}p, 👏${room.actions?.level3_bridge?.stats?.player1?.supportSent || 0}/😜${room.actions?.level3_bridge?.stats?.player1?.hateSent || 0})<br>
+              Rys: ${room.actions?.level3_bridge?.stats?.player2?.success ? '🟢' : (room.actions?.level3_bridge?.stats?.player2?.attemptsUsed !== undefined ? '🔴' : '⏳')} (${room.actions?.level3_bridge?.stats?.player2?.attemptsUsed || 0}p, 👏${room.actions?.level3_bridge?.stats?.player2?.supportSent || 0}/😜${room.actions?.level3_bridge?.stats?.player2?.hateSent || 0})
+            </div>
           </td>
           <td>
-            ${renderL3StatusColumn(p1Name, behavior.sChoice, behavior.sOutcome, behavior.sReveal, p2Name, behavior.rChoice, behavior.rOutcome, behavior.rReveal)}
+            ${renderL4StatusColumn(p1Name, behavior.sChoice, behavior.sOutcome, behavior.sReveal, p2Name, behavior.rChoice, behavior.rOutcome, behavior.rReveal)}
           </td>
           <td>
             <span class="behavior-badge ${behaviorBadgeClass}">${behavior.desc}</span>
@@ -484,18 +490,28 @@ function exportStatsToCSV() {
     'Stav hry',
     'Sova - Jméno',
     'Sova - Email',
-    'Sova - L3 Volba',
-    'Sova - L3 Výsledek',
+    'Sova - L3 Most Úspěch',
+    'Sova - L3 Most Pokusy',
+    'Sova - L3 Most Podpory',
+    'Sova - L3 Most Výsměchy',
+    'Sova - L3 Most Reakce',
+    'Sova - L4 Brána Volba',
+    'Sova - L4 Brána Výsledek',
     'Sova - Odhalení',
     'Rys - Jméno',
     'Rys - Email',
-    'Rys - L3 Volba',
-    'Rys - L3 Výsledek',
+    'Rys - L3 Most Úspěch',
+    'Rys - L3 Most Pokusy',
+    'Rys - L3 Most Podpory',
+    'Rys - L3 Most Výsměchy',
+    'Rys - L3 Most Reakce',
+    'Rys - L4 Brána Volba',
+    'Rys - L4 Brána Výsledek',
     'Rys - Odhalení',
-    'Kooperační scénář',
-    'Zrada (Popis chování)',
-    'L1 Maze - Pády do pasti',
-    'L2 Warmth - Zmrazení',
+    'L4 Kooperační scénář',
+    'L4 Popis chování',
+    'L1 Bludiště - Pády',
+    'L2 Vánice - Resety',
     'Celkem zpráv v reflexi'
   ];
 
@@ -518,6 +534,24 @@ function exportStatsToCSV() {
     const l1Resets = room.actions?.level1_darkness?.resetCount || 0;
     const l2Resets = room.actions?.level2_warmth?.resetCount || 0;
     const chatCount = room.reflectionChat ? Object.keys(room.reflectionChat).length : 0;
+
+    const l3b = room.actions?.level3_bridge || {};
+    const stats1 = l3b.stats?.player1 || {};
+    const stats2 = l3b.stats?.player2 || {};
+
+    const sBridgeSuccess = stats1.success !== undefined ? (stats1.success ? 'Ano' : 'Ne') : 'Nezahájeno';
+    const rBridgeSuccess = stats2.success !== undefined ? (stats2.success ? 'Ano' : 'Ne') : 'Nezahájeno';
+    
+    const sBridgeAtt = stats1.attemptsUsed !== undefined ? stats1.attemptsUsed : 0;
+    const rBridgeAtt = stats2.attemptsUsed !== undefined ? stats2.attemptsUsed : 0;
+
+    const sSupport = stats1.supportSent || 0;
+    const rSupport = stats2.supportSent || 0;
+    const sHate = stats1.hateSent || 0;
+    const rHate = stats2.hateSent || 0;
+
+    const sFinal = stats1.finalReactionSent ? (stats1.finalReactionSent === 'support' ? 'Podpora' : 'Výsměch') : 'Žádná';
+    const rFinal = stats2.finalReactionSent ? (stats2.finalReactionSent === 'support' ? 'Podpora' : 'Výsměch') : 'Žádná';
 
     const behavior = analyzeRoomBehavior(room);
 
@@ -555,11 +589,21 @@ function exportStatsToCSV() {
       getStateLabel(state),
       p1Name,
       p1Email,
+      sBridgeSuccess,
+      sBridgeAtt,
+      sSupport,
+      sHate,
+      sFinal,
       choiceSova,
       outcomeSova,
       revealSova,
       p2Name,
       p2Email,
+      rBridgeSuccess,
+      rBridgeAtt,
+      rSupport,
+      rHate,
+      rFinal,
       choiceRys,
       outcomeRys,
       revealRys,

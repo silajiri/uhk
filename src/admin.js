@@ -665,6 +665,7 @@ export function initializeAdmin() {
   document.getElementById('saveStudentsBtn').addEventListener('click', saveStudents);
   document.getElementById('resetRoomsBtn').addEventListener('click', resetRooms);
   document.getElementById('saveProfilesBtn').addEventListener('click', saveProfiles);
+  document.getElementById('saveLevel3ConfigBtn').addEventListener('click', saveLevel3Config);
   document.getElementById('avatarToggle').addEventListener('contextmenu', (e) => {
     e.preventDefault();
     saveAvatars();
@@ -677,6 +678,7 @@ export function initializeAdmin() {
   loadStudents();
   loadProfiles();
   loadAvatars();
+  loadLevel3Config();
   setupAvatarGalleryToggle();
   initLiveMonitoring();
 }
@@ -833,6 +835,55 @@ let monitoringListenerUnsubscribe = null;
     console.error("Chyba při načítání místností:", err);
     container.innerHTML = `<p class="error-message" style="color: var(--error); background: rgba(231, 76, 60, 0.1); padding: 1rem; border-radius: 12px; border: 1px solid rgba(231, 76, 60, 0.2);">Chyba při načítání místností: ${err.message}.<br><br><small>Tip: Ujistěte se, že máte nasazená aktuální databázová pravidla (<code>firebase deploy --only database</code>) a že se váš přihlášený e-mail přesně shoduje s e-mailem v pravidlech.</small></p>`;
   });
+}
+
+async function saveLevel3Config() {
+  const gridSize = parseInt(document.getElementById('bridgeGridSize').value) || 5;
+  const previewTime = parseInt(document.getElementById('bridgePreviewTime').value) || 5;
+  const tileCount = parseInt(document.getElementById('bridgeTileCount').value) || 7;
+
+  setButtonLoading('saveLevel3ConfigBtn', true, 'Ukládám...');
+  try {
+    const configData = { gridSize, previewTime, tileCount };
+    
+    // Save to global config
+    await update(ref(db, 'rooms/globalConfig/level3_bridge'), configData);
+    
+    // Push to all active rooms
+    const snap = await get(ref(db, 'rooms'));
+    const rooms = snap.val() || {};
+    const updates = {};
+    Object.keys(rooms).forEach(roomId => {
+      if (roomId !== 'globalConfig') {
+        updates[`${roomId}/config/level3_bridge`] = configData;
+      }
+    });
+    
+    if (Object.keys(updates).length > 0) {
+      await update(ref(db, 'rooms'), updates);
+    }
+    
+    showMessage('level3ConfigMessage', 'Konfigurace Skleněného mostu byla uložena.', 'success');
+  } catch (err) {
+    console.error(err);
+    showMessage('level3ConfigMessage', 'Chyba při ukládání konfigurace: ' + err.message, 'error');
+  } finally {
+    setButtonLoading('saveLevel3ConfigBtn', false, 'Uložit konfiguraci mostu');
+  }
+}
+
+async function loadLevel3Config() {
+  try {
+    const snap = await get(ref(db, 'rooms/globalConfig/level3_bridge'));
+    if (snap.exists()) {
+      const data = snap.val();
+      if (data.gridSize) document.getElementById('bridgeGridSize').value = data.gridSize;
+      if (data.previewTime) document.getElementById('bridgePreviewTime').value = data.previewTime;
+      if (data.tileCount) document.getElementById('bridgeTileCount').value = data.tileCount;
+    }
+  } catch (err) {
+    console.warn('loadLevel3Config error', err);
+  }
 }
 
 

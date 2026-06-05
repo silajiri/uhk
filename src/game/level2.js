@@ -614,7 +614,7 @@ function showResetOverlay() {
 }
 
 function handleSuccess(db, pairId) {
-  set(ref(db, `rooms/${pairId}/actions/level3_truth`), null).then(() => {
+  set(ref(db, `rooms/${pairId}/actions/level3_bridge`), null).then(() => {
     set(ref(db, `rooms/${pairId}/state`), 'level3');
   });
 }

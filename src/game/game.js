@@ -2,6 +2,7 @@ import { ref, onValue, update, serverTimestamp, get } from 'https://www.gstatic.
 import { initLevel1 } from './level1.js';
 import { initLevel2 } from './level2.js';
 import { initLevel3 } from './level3.js';
+import { initLevel4 } from './level4.js';
 import { initReflection } from './reflection.js';
 
 export function initGameRouter(db, pairId, role, animal, avatar) {
@@ -82,8 +83,8 @@ export function initGameRouter(db, pairId, role, animal, avatar) {
           <div class="level-transition-card">
             <div class="success-icon">💎</div>
             <h1>Mráz ustupuje!</h1>
-            <p>Díky vaší obětavosti a střídání krystalu jste přečkali nejhorší noc. Mlha se rozestupuje a před vámi stojí Brána pravdy.</p>
-            <div class="status-message">Hledejte úlomky kódu v záři brány...</div>
+            <p>Díky vaší obětavosti jste přečkali nejhorší mrazivou noc. Cesta dál však vede přes hlubokou propast, nad kterou se tyčí tajuplný Skleněný most...</p>
+            <div class="status-message">Hledejte pochozí dlaždice a zapamatujte si je...</div>
           </div>
         `;
 
@@ -91,7 +92,26 @@ export function initGameRouter(db, pairId, role, animal, avatar) {
         setTimeout(() => {
           onValue(ref(db, `rooms/${pairId}/state`), (snap) => {
             if (snap.val() === 'level3') {
-              initLevel3(db, pairId, role);
+              initLevel3(db, pairId, role, animal, avatar);
+            }
+          }, { onlyOnce: true });
+        }, 5000);
+        break;
+      case 'level4':
+        root.innerHTML = `
+          <div class="level-transition-card">
+            <div class="success-icon">🌉</div>
+            <h1>Most překonán!</h1>
+            <p>Úspěšně jste překročili nebezpečnou propast. Mlha se rozestupuje a před vámi stojí kamenná Brána pravdy.</p>
+            <div class="status-message">Hledejte úlomky kódu v záři brány...</div>
+          </div>
+        `;
+
+        // Automatický přechod po 5 sekundách
+        setTimeout(() => {
+          onValue(ref(db, `rooms/${pairId}/state`), (snap) => {
+            if (snap.val() === 'level4') {
+              initLevel4(db, pairId, role);
             }
           }, { onlyOnce: true });
         }, 5000);
