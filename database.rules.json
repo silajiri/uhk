@@ -15,8 +15,8 @@
       ".write": false
     },
     "rooms": {
-      ".read": "auth != null && (auth.token.email == 'sila.jiri@gmail.com' || auth.token.email == 'silajiri@gmail.com' || auth.token.email == 'sila.tereza@gmail.com' || auth.token.email == 'silatereza@gmail.com' || auth.token.email == 'tereza.silova@zsjrk.cz' || auth.token.email == 'sila.jiri@zsmslipa.cz' || auth.token.email == 'jiri.sila@zsmslipa.cz')",
-      ".write": "auth != null && (auth.token.email == 'sila.jiri@gmail.com' || auth.token.email == 'silajiri@gmail.com' || auth.token.email == 'sila.tereza@gmail.com' || auth.token.email == 'silatereza@gmail.com' || auth.token.email == 'tereza.silova@zsjrk.cz' || auth.token.email == 'sila.jiri@zsmslipa.cz' || auth.token.email == 'jiri.sila@zsmslipa.cz')",
+      ".read": "auth != null && (auth.token.email == 'sila.jiri@gmail.com' || auth.token.email == 'silajiri@gmail.com' || auth.token.email == 'sila.tereza@gmail.com' || auth.token.email == 'silatereza@gmail.com' || auth.token.email == 'tereza.silova@zsjrk.cz' || auth.token.email == 'sila.jiri@zsmslipa.cz' || auth.token.email == 'jiri.sila@zsmslipa.cz' || auth.token.email == 'jiri.janovec@zsjrk.cz' || auth.token.email == 'jirijanovec@zsjrk.cz')",
+      ".write": "auth != null && (auth.token.email == 'sila.jiri@gmail.com' || auth.token.email == 'silajiri@gmail.com' || auth.token.email == 'sila.tereza@gmail.com' || auth.token.email == 'silatereza@gmail.com' || auth.token.email == 'tereza.silova@zsjrk.cz' || auth.token.email == 'sila.jiri@zsmslipa.cz' || auth.token.email == 'jiri.sila@zsmslipa.cz' || auth.token.email == 'jiri.janovec@zsjrk.cz' || auth.token.email == 'jirijanovec@zsjrk.cz')",
       "$roomId": {
         ".read": "auth != null && (data.child('players/animal1/uid').val() === auth.uid || data.child('players/animal2/uid').val() === auth.uid)",
         ".write": "auth != null && (data.child('players/animal1/uid').val() === auth.uid || data.child('players/animal2/uid').val() === auth.uid || !data.exists())"
