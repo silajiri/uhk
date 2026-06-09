@@ -12,7 +12,7 @@ export function initGameRouter(db, pairId, role, animal, avatar) {
   });
 
   console.log(`Game Router spuštěn pro místnost: ${pairId}, role: ${role}`);
-  
+
   if (!pairId || pairId === "undefined") {
     console.error("Chyba: Chybí pairId! Hráč není přiřazen do místnosti.");
     document.getElementById('game-root').innerHTML = '<div class="status-message">Chyba: Nejste přiřazeni do žádné dvojice. Prosím, kontaktujte učitele.</div>';
@@ -33,9 +33,9 @@ export function initGameRouter(db, pairId, role, animal, avatar) {
   onValue(stateRef, (snapshot) => {
     const state = snapshot.val() || 'level1';
     console.log("Aktuální stav hry v DB:", state);
-    
+
     const root = document.getElementById('game-root');
-    if (root) root.innerHTML = ''; 
+    if (root) root.innerHTML = '';
 
     switch (state) {
       case 'level1':
@@ -64,18 +64,19 @@ export function initGameRouter(db, pairId, role, animal, avatar) {
             <div class="success-icon">🌟</div>
             <h1>Cíl dosažen!</h1>
             <p>Společně jste ruku v ruce bezpečně prošli temným lesem. Sova vedla s rozvahou a Rys projevil hlubokou důvěru.</p>
-            <div class="status-message">Připravte se, Mlžný les začíná chladnout...</div>
+            <div class="status-message" style="margin-bottom: 1.5rem;">Připravte se, Mlžný les začíná chladnout...</div>
+            <button id="btn-transition-continue" class="btn-crystal" style="width: 100%; padding: 1.1rem; font-size: 1.15rem; font-weight: 700; cursor: pointer; border-radius: 18px;">
+              Pokračovat do další úrovně ➔
+            </button>
           </div>
         `;
 
-        // Automatický přechod po 5 sekundách
-        setTimeout(() => {
-          onValue(ref(db, `rooms/${pairId}/state`), (snap) => {
-            if (snap.val() === 'level2') {
-              initLevel2(db, pairId, role, animal, avatar);
-            }
-          }, { onlyOnce: true });
-        }, 5000);
+        const btn = document.getElementById('btn-transition-continue');
+        if (btn) {
+          btn.onclick = () => {
+            initLevel2(db, pairId, role, animal, avatar);
+          };
+        }
         break;
       }
       case 'level3':
@@ -84,18 +85,19 @@ export function initGameRouter(db, pairId, role, animal, avatar) {
             <div class="success-icon">💎</div>
             <h1>Mráz ustupuje!</h1>
             <p>Díky vaší obětavosti jste přečkali nejhorší mrazivou noc. Cesta dál však vede přes hlubokou propast, nad kterou se tyčí tajuplný Skleněný most...</p>
-            <div class="status-message">Hledejte pochozí dlaždice a zapamatujte si je...</div>
+            <div class="status-message" style="margin-bottom: 1.5rem;">Hledejte zelená políčka a zapamatujte si je...</div>
+            <button id="btn-transition-continue" class="btn-crystal" style="width: 100%; padding: 1.1rem; font-size: 1.15rem; font-weight: 700; cursor: pointer; border-radius: 18px;">
+              Pokračovat do další úrovně ➔
+            </button>
           </div>
         `;
 
-        // Automatický přechod po 5 sekundách
-        setTimeout(() => {
-          onValue(ref(db, `rooms/${pairId}/state`), (snap) => {
-            if (snap.val() === 'level3') {
-              initLevel3(db, pairId, role, animal, avatar);
-            }
-          }, { onlyOnce: true });
-        }, 5000);
+        const btn3 = document.getElementById('btn-transition-continue');
+        if (btn3) {
+          btn3.onclick = () => {
+            initLevel3(db, pairId, role, animal, avatar);
+          };
+        }
         break;
       case 'level4':
         root.innerHTML = `
@@ -103,18 +105,19 @@ export function initGameRouter(db, pairId, role, animal, avatar) {
             <div class="success-icon">🌉</div>
             <h1>Most překonán!</h1>
             <p>Úspěšně jste překročili nebezpečnou propast. Mlha se rozestupuje a před vámi stojí kamenná Brána pravdy.</p>
-            <div class="status-message">Hledejte úlomky kódu v záři brány...</div>
+            <div class="status-message" style="margin-bottom: 1.5rem;">Hledejte úlomky kódu v záři brány...</div>
+            <button id="btn-transition-continue" class="btn-crystal" style="width: 100%; padding: 1.1rem; font-size: 1.15rem; font-weight: 700; cursor: pointer; border-radius: 18px;">
+              Pokračovat do další úrovně ➔
+            </button>
           </div>
         `;
 
-        // Automatický přechod po 5 sekundách
-        setTimeout(() => {
-          onValue(ref(db, `rooms/${pairId}/state`), (snap) => {
-            if (snap.val() === 'level4') {
-              initLevel4(db, pairId, role);
-            }
-          }, { onlyOnce: true });
-        }, 5000);
+        const btn4 = document.getElementById('btn-transition-continue');
+        if (btn4) {
+          btn4.onclick = () => {
+            initLevel4(db, pairId, role);
+          };
+        }
         break;
       case 'reflection':
         initReflection(db, pairId, role, animal);

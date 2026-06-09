@@ -3,7 +3,7 @@ import { ref, onValue, set, update, serverTimestamp, get } from 'https://www.gst
 export function initLevel2(db, pairId, role, animal, avatar) {
   const isSova = (role === 'player1');
   const root = document.getElementById('game-root');
-  
+
   let myAnimal = animal || (isSova ? 'Sova' : 'Rys');
   let myAvatar = avatar || 'default.svg';
   let partnerAnimal = isSova ? 'Rys' : 'Sova';
@@ -38,14 +38,14 @@ export function initLevel2(db, pairId, role, animal, avatar) {
       <div class="level-instructions" style="display: none;"></div>
       <div class="warmth-bars">
         <div class="bar-container">
-          <label id="label-player1">Teplo: Sova ${isSova ? '<span class="role-ty-badge" style="background: rgba(52, 152, 219, 0.18); color: var(--sova-color, #3498db); padding: 0.2rem 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; border: 1px solid rgba(52, 152, 219, 0.35); margin-left: 0.5rem; display: inline-block; box-shadow: 0 0 10px rgba(52, 152, 219, 0.25);">TY</span>' : ''}</label>
+          <label id="label-player1">Teplo: ${sovaAnimal} ${isSova ? '<span class="role-ty-badge" style="background: rgba(52, 152, 219, 0.18); color: var(--sova-color, #3498db); padding: 0.2rem 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; border: 1px solid rgba(52, 152, 219, 0.35); margin-left: 0.5rem; display: inline-block; box-shadow: 0 0 10px rgba(52, 152, 219, 0.25);">TY</span>' : ''}</label>
           <div class="progress-bar">
             <div id="bar-player1" class="fill" style="width: 100%"></div>
             <div class="progress-bar-bubbles" id="bubbles-player1"></div>
           </div>
         </div>
         <div class="bar-container">
-          <label id="label-player2">Teplo: Rys ${!isSova ? '<span class="role-ty-badge" style="background: rgba(230, 126, 34, 0.18); color: var(--rys-color, #e67e22); padding: 0.2rem 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; border: 1px solid rgba(230, 126, 34, 0.35); margin-left: 0.5rem; display: inline-block; box-shadow: 0 0 10px rgba(230, 126, 34, 0.25);">TY</span>' : ''}</label>
+          <label id="label-player2">Teplo: ${rysAnimal} ${!isSova ? '<span class="role-ty-badge" style="background: rgba(230, 126, 34, 0.18); color: var(--rys-color, #e67e22); padding: 0.2rem 0.6rem; border-radius: 8px; font-size: 0.85rem; font-weight: 800; border: 1px solid rgba(230, 126, 34, 0.35); margin-left: 0.5rem; display: inline-block; box-shadow: 0 0 10px rgba(230, 126, 34, 0.25);">TY</span>' : ''}</label>
           <div class="progress-bar">
             <div id="bar-player2" class="fill" style="width: 100%"></div>
             <div class="progress-bar-bubbles" id="bubbles-player2"></div>
@@ -56,10 +56,10 @@ export function initLevel2(db, pairId, role, animal, avatar) {
       <div class="crystal-scene">
         <!-- Levý avatar (Sova) -->
         <div id="crystal-avatar-player1" class="crystal-avatar player1-avatar">
-          <img src="assets/avatars/default.svg" id="crystal-img-player1" alt="Sova" />
-          <span class="avatar-label" id="crystal-label-player1">Sova</span>
+          <img src="assets/avatars/default.svg" id="crystal-img-player1" alt="${sovaAnimal}" />
+          <span class="avatar-label" id="crystal-label-player1">${sovaAnimal}</span>
         </div>
-
+ 
         <!-- Krystal -->
         <div id="crystal-svg-container" class="crystal-svg-container holder-none">
           <svg class="crystal-svg" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
@@ -72,11 +72,11 @@ export function initLevel2(db, pairId, role, animal, avatar) {
             <circle cx="50" cy="60" r="8" fill="#ffffff" filter="blur(3px)" opacity="0.6" />
           </svg>
         </div>
-
+ 
         <!-- Pravý avatar (Rys) -->
         <div id="crystal-avatar-player2" class="crystal-avatar player2-avatar">
-          <img src="assets/avatars/default.svg" id="crystal-img-player2" alt="Rys" />
-          <span class="avatar-label" id="crystal-label-player2">Rys</span>
+          <img src="assets/avatars/default.svg" id="crystal-img-player2" alt="${rysAnimal}" />
+          <span class="avatar-label" id="crystal-label-player2">${rysAnimal}</span>
         </div>
       </div>
 
@@ -181,7 +181,7 @@ export function initLevel2(db, pairId, role, animal, avatar) {
         // 1. Aktualizace ukazatelů teploty
         if (data.temperatures) {
           currentTemps = data.temperatures;
-          
+
           const bar1 = document.getElementById('bar-player1');
           const bar2 = document.getElementById('bar-player2');
           const t1 = data.temperatures.player1;
@@ -200,7 +200,7 @@ export function initLevel2(db, pairId, role, animal, avatar) {
             bar2.style.background = color2;
             bar2.style.boxShadow = `0 0 20px ${color2.replace('rgb', 'rgba').replace(')', ', 0.5)')}`;
           }
-          
+
           const myTemp = isSova ? t1 : t2;
           const frostOverlay = document.getElementById('frost-overlay');
           if (frostOverlay) {
@@ -237,8 +237,8 @@ export function initLevel2(db, pairId, role, animal, avatar) {
           } else {
             const title = `${myAnimal} (Teplotní strážce)`;
             const text = `Tvoje role v této úrovni: <strong style='color: ${isSova ? "var(--sova-color, #3498db)" : "var(--rys-color, #e67e22)"}; font-size: 1.3rem;'>${myAnimal}</strong>.<br><br>` +
-              `Ocitli jste se v mrazivé mlze, která vám postupně ubírá teplo. Uprostřed obrazovky vidíte své teplotní bary.<br><br>` +
-              `Pouze držitel krystalu se zahřívá, zatímco druhý hráč mrzne. **Musíte si krystal střídat** klikáním na tlačítko tak, aby nikdo z vás nezmrzl (teplota nesmí klesnout na 0).<br><br>` +
+              `Ocitli jste se v mrazivé mlze, která vám postupně ubírá teplo. Uprostřed obrazovky vidíte své teplotní stupnice.<br><br>` +
+              `Pouze držitel krystalu se zahřívá, zatímco druhý hráč mrzne. Musíte si krystal střídat klikáním na tlačítko tak, aby nikdo z vás nezmrzl (teplota nesmí klesnout na nulu).<br><br>` +
               `Pokud začínáte mrznout, klikněte na tlačítko <em>Mrznu! Potřebuji teplo!</em>, které upozorní tvého parťáka <strong>${partnerAnimal}</strong>. Musíte spolu vydržet 120 sekund.`;
 
             showInstructionsModal(title, text, () => {
@@ -252,7 +252,7 @@ export function initLevel2(db, pairId, role, animal, avatar) {
           if (bothReady || isGameRunning) {
             hideWaitingOverlay();
             instructionsDismissed = true;
-            
+
             // Sova nastaví startovní čas, pokud ještě neběží
             if (isSova && !data.startTime) {
               update(levelRef, { startTime: serverTimestamp() });
@@ -267,9 +267,9 @@ export function initLevel2(db, pairId, role, animal, avatar) {
           levelStartTime = data.startTime;
           const elapsed = Math.floor((Date.now() - levelStartTime) / 1000);
           timerEl.textContent = `Přežijte: ${Math.max(0, 120 - elapsed)}s`;
-          
+
           updateWeatherUI(elapsed);
-          
+
           if (elapsed >= 120 && isSova && instructionsDismissed && !levelFinished) {
             levelFinished = true;
             handleSuccess(db, pairId);
@@ -299,7 +299,7 @@ export function initLevel2(db, pairId, role, animal, avatar) {
 
         // 6. Správa ovládacích prvků a časovače mrazu
         updateHolderUI(data.crystalHolder, role, controlsEl, crystalStatusEl, levelRef, db, pairId);
-        
+
         // Interval teploměru běží pouze pokud hra odstartovala (oběma ready nebo nastaveným startTime)
         if (instructionsDismissed && (bothReady || isGameRunning)) {
           manageWarmthInterval(data.crystalHolder, role, db, pairId);
@@ -315,7 +315,7 @@ export function initLevel2(db, pairId, role, animal, avatar) {
 
   function manageWarmthInterval(holder, myRole, db, pairId) {
     const amIHolder = (myRole === holder);
-    
+
     if (amIHolder && !intervalId) {
       // Jsem držitel: každou vteřinu počítám změnu a zapisuji do DB
       intervalId = setInterval(() => {
@@ -331,7 +331,7 @@ export function initLevel2(db, pairId, role, animal, avatar) {
         if (levelStartTime) {
           elapsed = Math.floor((Date.now() - levelStartTime) / 1000);
         }
-        
+
         const rates = getWarmthRates(elapsed);
 
         if (myRole === 'player1') {
@@ -539,7 +539,7 @@ function showInstructionsModal(title, text, onDismiss) {
     </div>
   `;
   document.body.appendChild(overlay);
-  
+
   const btn = overlay.querySelector('#btn-dismiss-instruction');
   if (btn) {
     btn.onclick = () => {

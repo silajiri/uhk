@@ -26,11 +26,11 @@ const auth = getAuth(app);
 function updateNavbar(role, animal, avatar) {
   const badgeEl = document.getElementById('playerBadge');
   const nameEl = document.getElementById('playerAnimalName');
-  
+
   const isSova = (role === 'player1');
-  const roleText = isSova ? '🦉 SOVA' : '🐾 RYS';
+  const roleText = isSova ? '🛡️ STRÁŽCE 1' : '🛡️ STRÁŽCE 2';
   const roleColor = isSova ? 'var(--sova-color, #3498db)' : 'var(--rys-color, #e67e22)';
-  
+
   if (nameEl) {
     nameEl.innerHTML = `
       <div style="font-size: 0.78rem; font-weight: 700; letter-spacing: 0.05em; color: var(--muted); text-transform: uppercase; display: flex; align-items: center; gap: 4px;">

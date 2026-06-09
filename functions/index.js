@@ -21,7 +21,9 @@ const ADMIN_EMAILS = [
   'silajiri@gmail.com',
   'sila.tereza@gmail.com',
   'silatereza@gmail.com',
-  'tereza.silova@zsjrk.cz'
+  'tereza.silova@zsjrk.cz',
+  'jiri.janovec@zsjrk.cz',
+  'jirijanovec@zsjrk.cz'
   // TODO: Add more admin emails here
 ];
 
@@ -34,7 +36,7 @@ function setCorsHeaders(res) {
 function isAllowedOrigin(req) {
   const origin = req.get('origin') || req.get('referer');
   if (!origin) return false;
-  
+
   // Check if origin matches allowed list
   return ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed));
 }
@@ -157,7 +159,7 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
       if (type === 'pairs') {
         const mapSnap = await db.ref('/mappings').once('value');
         const mappings = mapSnap.val() || {};
-        
+
         const grouped = {};
         Object.entries(mappings).forEach(([key, val]) => {
           const pId = val.pairId;
@@ -313,9 +315,9 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
       // Write to /mappings
       const mappings = {};
       data.forEach((student) => {
-        mappings[encodeEmailKey(student.email)] = { 
+        mappings[encodeEmailKey(student.email)] = {
           email: student.email.trim(),
-          animal: student.animal.trim() 
+          animal: student.animal.trim()
         };
       });
       await db.ref('/mappings').set(mappings);

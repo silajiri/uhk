@@ -16,43 +16,51 @@ export function initLevel3(db, pairId, role, animal, avatar) {
     const T = parseInt(config.previewTime) || 5;
     const K = parseInt(config.tileCount) || 7;
 
-    get(bridgeRef).then((snapshot) => {
-      let data = snapshot.val();
-      if (!data || !data.activePlayer) {
-        // Initialize if not present
-        const targetTiles = generateTargetTiles(N, K);
-        data = {
-          activePlayer: 'player1',
-          targetTiles: targetTiles,
-          attempts: 0,
-          correctSelections: [],
-          phase: 'preview', // preview | playing | evaluation | swapping | finished
-          lastInteraction: null,
-          finalReaction: null,
-          stats: {
-            player1: {
-              supportSent: 0,
-              hateSent: 0,
-              success: false,
-              attemptsUsed: 0,
-              finalReactionSent: null
-            },
-            player2: {
-              supportSent: 0,
-              hateSent: 0,
-              success: false,
-              attemptsUsed: 0,
-              finalReactionSent: null
-            }
+    if (isSova) {
+      // Sova always resets/initializes the bridge state on level start
+      const targetTiles = generateTargetTiles(N, K);
+      const data = {
+        activePlayer: 'player1',
+        targetTiles: targetTiles,
+        attempts: 0,
+        correctSelections: [],
+        phase: 'preview',
+        ready: {
+          player1: false,
+          player2: false
+        },
+        lastInteraction: null,
+        finalReaction: null,
+        stats: {
+          player1: {
+            supportSent: 0,
+            hateSent: 0,
+            success: false,
+            attemptsUsed: 0,
+            finalReactionSent: null
+          },
+          player2: {
+            supportSent: 0,
+            hateSent: 0,
+            success: false,
+            attemptsUsed: 0,
+            finalReactionSent: null
           }
-        };
-        set(bridgeRef, data).then(() => {
-          startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef);
-        });
-      } else {
+        }
+      };
+      set(bridgeRef, data).then(() => {
         startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef);
-      }
-    });
+      });
+    } else {
+      // Rys waits for Sova to initialize, or joins if already present
+      const unsubscribe = onValue(bridgeRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.activePlayer && data.phase !== 'finished') {
+          unsubscribe();
+          startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef);
+        }
+      });
+    }
   });
 }
 
@@ -141,34 +149,17 @@ function startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef) {
         <span>Jsi: <strong style="color: ${isSova ? 'var(--sova-color, #3498db)' : 'var(--rys-color, #e67e22)'}">${myAnimal}</strong></span>
       `;
     }
-
-    if (!instructionsShown) {
-      instructionsShown = true;
-      showWelcomeInstructions();
-    }
   });
 
-  // Welcome modal depending on active player
-  function showWelcomeInstructions() {
+  // Welcome modal with the same instructions for both players
+  function showWelcomeInstructions(bridgeRef, role) {
     const title = `Skleněný most`;
-    let text = "";
-
-    // We look at the starting activePlayer (which is player1 by default)
-    if (isSova) {
-      text = `Tvoje role v této úrovni: <strong style="color: var(--sova-color, #3498db); font-size: 1.25rem;">Hledáš pochozí cestu!</strong><br><br>
-        1. Na začátku se vám oběma na <strong>${T} sekund</strong> ukáže správná cesta složená z <strong>${K} pochozích dlaždic</strong>.<br>
-        2. Zapamatuj si jejich polohu!<br>
-        3. Jakmile cesta zmizí, **klikni na všechna pochozí pole**. Splašíš-li se a šlápneš vedle, spadl jsi a zkoušíš to znovu.<br>
-        4. Máš celkem **3 pokusy** na bezpečné překročení propasti.<br><br>
-        *Parťák tě sleduje v reálném čase a může tě podporovat!*`;
-    } else {
-      text = `Tvoje role v této úrovni: <strong style="color: var(--rys-color, #e67e22); font-size: 1.25rem;">Sleduješ parťáka!</strong><br><br>
-        1. Na začátku uvidíš správnou cestu po dobu <strong>${T} sekund</strong>. Zapamatuj si ji také!<br>
-        2. Hráč <strong>${partnerAnimal}</strong> se pokusí cestu přejít. Ty v reálném čase vidíš jeho pokrok a úspěšná pole.<br>
-        3. Pomocí tlačítek na obrazovce mu posílej průběžnou **podporu 👏** nebo **výsměch 😜**.<br>
-        4. Na konci jeho pokusů musíš povinně vybrat finální reakci (👏 nebo 😂), aby hra pokračovala.`;
-    }
-    showInstructionsModal(title, text);
+    const text = `Vítej v další hře! Nyní bude vaším úkolem projít po starém nestabilním mostě. Zapamatuj si polohu všech zelených políček. Pouze po nich se dostaneš k cíli. Na zapamatování máš omezený čas (<strong>${T} sekund</strong>).`;
+    showInstructionsModal(title, text, () => {
+      update(bridgeRef, {
+        [`ready/${role}`]: true
+      });
+    });
   }
 
   // Subscribe to level updates
@@ -186,6 +177,30 @@ function startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef) {
 
     attemptsEl.textContent = `Pokusy: ${attempts}/3`;
 
+    // Readiness check
+    const myReadyKey = role;
+    const amIReady = data.ready && data.ready[myReadyKey];
+    const ready1 = data.ready && data.ready.player1;
+    const ready2 = data.ready && data.ready.player2;
+    const bothReady = ready1 && ready2;
+
+    if (!instructionsShown) {
+      instructionsShown = true;
+      if (amIReady) {
+        if (!bothReady) {
+          showWaitingOverlay();
+        }
+      } else {
+        showWelcomeInstructions(bridgeRef, role);
+      }
+    } else {
+      if (bothReady) {
+        hideWaitingOverlay();
+      } else if (amIReady) {
+        showWaitingOverlay();
+      }
+    }
+
     // Phase UI renderer
     if (phase === 'preview') {
       phaseStatusEl.innerHTML = `🌟 Náhled cesty...`;
@@ -193,28 +208,34 @@ function startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef) {
       localSelected = [];
       renderPreviewGrid(targetTiles);
       controlsContainer.innerHTML = '';
-      
-      // Active player runs the countdown timer and updates DB state
-      if (isActive && !localPreviewTimer) {
-        let secondsLeft = T;
-        phaseStatusEl.innerHTML = `⏱️ Cesta zmizí za ${secondsLeft}s`;
-        localPreviewTimer = setInterval(() => {
-          secondsLeft--;
-          if (secondsLeft <= 0) {
-            clearInterval(localPreviewTimer);
-            localPreviewTimer = null;
-            update(bridgeRef, { phase: 'playing' });
-          } else {
-            phaseStatusEl.innerHTML = `⏱️ Cesta zmizí za ${secondsLeft}s`;
-          }
-        }, 1000);
+
+      // Both players run the countdown timer locally for their UI
+      if (bothReady) {
+        if (!localPreviewTimer) {
+          let secondsLeft = T;
+          phaseStatusEl.innerHTML = `⏱️ Cesta zmizí za ${secondsLeft}s`;
+          localPreviewTimer = setInterval(() => {
+            secondsLeft--;
+            if (secondsLeft <= 0) {
+              clearInterval(localPreviewTimer);
+              localPreviewTimer = null;
+              if (isActive) {
+                update(bridgeRef, { phase: 'playing' });
+              }
+            } else {
+              phaseStatusEl.innerHTML = `⏱️ Cesta zmizí za ${secondsLeft}s`;
+            }
+          }, 1000);
+        }
+      } else {
+        phaseStatusEl.innerHTML = `🌟 Náhled cesty (čekání na spuštění)...`;
       }
     } else if (phase === 'playing') {
-      phaseStatusEl.innerHTML = isActive 
-        ? `🏃 Tvůj tah! Najdi všech ${K} pochozích dlaždic.` 
+      phaseStatusEl.innerHTML = isActive
+        ? `🏃 Tvůj tah! Najdi všech ${K} zelených políček.`
         : `👀 Sleduješ tahy hráče ${partnerAnimal}...`;
       phaseStatusEl.style.color = isActive ? '#3498db' : '#9b59b6';
-      
+
       // Render interactive/view grid
       renderPlayingGrid(isActive, targetTiles, correctSelections);
 
@@ -227,7 +248,7 @@ function startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef) {
     } else if (phase === 'evaluation') {
       phaseStatusEl.innerHTML = `📋 Vyhodnocení pokusu...`;
       phaseStatusEl.style.color = '#e74c3c';
-      
+
       const activeSuccess = correctSelections.length === targetTiles.length;
       renderPlayingGrid(false, targetTiles, correctSelections);
 
@@ -284,7 +305,7 @@ function startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef) {
     for (let i = 0; i < totalTiles; i++) {
       const tile = document.createElement('div');
       tile.className = 'bridge-tile preview';
-      tile.textContent = `${i + 1}`;
+      tile.textContent = '';
       if (targetTiles.includes(i)) {
         tile.classList.add('target');
       }
@@ -300,7 +321,7 @@ function startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef) {
     for (let i = 0; i < totalTiles; i++) {
       const tile = document.createElement('button');
       tile.className = 'bridge-tile';
-      tile.textContent = `${i + 1}`;
+      tile.textContent = '';
 
       const isCorrect = correctSelections.includes(i);
       const isLocallySelected = localSelected.includes(i);
@@ -332,7 +353,7 @@ function startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef) {
       // Correct click
       if (!correctSelections.includes(index) && !localSelected.includes(index)) {
         localSelected.push(index);
-        
+
         // Show correct locally
         const tiles = gridEl.querySelectorAll('.bridge-tile');
         if (tiles[index]) {
@@ -345,13 +366,13 @@ function startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef) {
           // Success!
           const activePlayer = currentData.activePlayer;
           const currentAttempts = currentData.attempts || 0;
-          
+
           const statsUpdate = {};
           statsUpdate[`stats/${activePlayer}/success`] = true;
           statsUpdate[`stats/${activePlayer}/attemptsUsed`] = currentAttempts + 1;
           statsUpdate[`correctSelections`] = localSelected;
           statsUpdate[`phase`] = 'evaluation';
-          
+
           update(bridgeRef, statsUpdate);
         } else {
           // Sync correctSelections with DB so watcher can see progress
@@ -388,7 +409,7 @@ function startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef) {
         statsUpdate[`attempts`] = 3;
         statsUpdate[`correctSelections`] = [];
         statsUpdate[`phase`] = 'evaluation';
-        
+
         update(bridgeRef, statsUpdate);
       } else {
         // Increment attempts, clear selections in DB
@@ -457,7 +478,7 @@ function startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef) {
     } else {
       feedbackOverlay.classList.add('show-hate');
       feedbackOverlay.innerHTML = `<div class="feedback-text">😜 Parťák se ti směje!</div>`;
-      
+
       const container = document.getElementById('bridge-container');
       if (container) {
         container.classList.add('shake');
@@ -626,7 +647,7 @@ function startBridgeGame(db, pairId, role, animal, avatar, N, T, K, bridgeRef) {
   }
 }
 
-function showInstructionsModal(title, text) {
+function showInstructionsModal(title, text, onDismiss) {
   const old = document.getElementById('instructions-modal');
   if (old) return;
 
@@ -646,7 +667,64 @@ function showInstructionsModal(title, text) {
 
   const btn = overlay.querySelector('#btn-dismiss-instruction');
   if (btn) {
-    btn.onclick = () => overlay.remove();
+    btn.onclick = () => {
+      overlay.remove();
+      if (onDismiss) onDismiss();
+    };
+  }
+}
+
+function showWaitingOverlay() {
+  const old = document.getElementById('waiting-overlay');
+  if (old) return;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'waiting-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 15, 25, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-family: 'Fredoka', 'Segoe UI', sans-serif;
+  `;
+  overlay.innerHTML = `
+    <div style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 24px; padding: 2.5rem; max-width: 450px; width: 90%; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.3); backdrop-filter: blur(10px);">
+      <div class="waiting-spinner" style="margin: 0 auto 1.5rem auto; width: 50px; height: 50px; border: 5px solid rgba(255,255,255,0.1); border-top: 5px solid #6752ff; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+      <h2 style="color: #fff; margin: 0 0 1rem 0; font-size: 1.8rem;">Čekání na parťáka...</h2>
+      <p style="font-size: 1.1rem; line-height: 1.5; color: #dfd5f0; margin: 0;">
+        Hra se spustí, jakmile tvůj parťák potvrdí, že také rozumí zadání.
+      </p>
+    </div>
+  `;
+
+  if (!document.getElementById('waiting-overlay-styles')) {
+    const s = document.createElement('style');
+    s.id = 'waiting-overlay-styles';
+    s.innerHTML = `
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(s);
+  }
+
+  document.body.appendChild(overlay);
+}
+
+function hideWaitingOverlay() {
+  const overlay = document.getElementById('waiting-overlay');
+  if (overlay) {
+    overlay.remove();
   }
 }
 
@@ -744,10 +822,10 @@ function injectStyles() {
       cursor: default;
     }
     .bridge-tile.preview.target {
-      background: linear-gradient(135deg, #f1c40f, #e67e22);
-      border-color: #f39c12;
-      color: #070b1d;
-      box-shadow: 0 0 15px rgba(241, 196, 15, 0.5), inset 0 2px 4px rgba(255,255,255,0.3);
+      background: linear-gradient(135deg, #2ecc71, #27ae60);
+      border-color: #27ae60;
+      color: white;
+      box-shadow: 0 0 15px rgba(46, 204, 113, 0.5), inset 0 2px 4px rgba(255,255,255,0.3);
     }
     .bridge-tile.correct {
       background: linear-gradient(135deg, #27ae60, #2ecc71) !important;

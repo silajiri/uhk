@@ -34,7 +34,7 @@ const testCases = [
     name: "Test 1: Úplný začátek (neaktivní L3)",
     room: {
       actions: {
-        level3_truth: {
+        level4_truth: {
           sovaShared: false,
           rysShared: false
         }
@@ -56,7 +56,7 @@ const testCases = [
     name: "Test 2: Částečné sdílení (pouze Sova)",
     room: {
       actions: {
-        level3_truth: {
+        level4_truth: {
           sovaShared: true,
           sovaShardStatus: "true",
           rysShared: false
@@ -79,7 +79,7 @@ const testCases = [
     name: "Test 3: Úspěšná spolupráce (oba pravda)",
     room: {
       actions: {
-        level3_truth: {
+        level4_truth: {
           sovaShared: true,
           sovaShardStatus: "true",
           rysShared: true,
@@ -104,7 +104,7 @@ const testCases = [
     name: "Test 4: Jednostranná zrada - Sova podvedla Rysa, Rys dešifroval a utekl",
     room: {
       actions: {
-        level3_truth: {
+        level4_truth: {
           sovaShared: true,
           sovaShardStatus: "fake",
           rysShared: true,
@@ -129,7 +129,7 @@ const testCases = [
     name: "Test 5: Jednostranná zrada - Rys podvedl Sovu, Sova zůstala čekat/nedešifrovala",
     room: {
       actions: {
-        level3_truth: {
+        level4_truth: {
           sovaShared: true,
           sovaShardStatus: "true",
           rysShared: true,
@@ -154,7 +154,7 @@ const testCases = [
     name: "Test 6: Vzájemná zrada - oba fake, oba uvězněni po dešifrování",
     room: {
       actions: {
-        level3_truth: {
+        level4_truth: {
           sovaShared: true,
           sovaShardStatus: "fake",
           rysShared: true,
