@@ -12,12 +12,13 @@ export function initReflection(db, pairId, role, animal) {
   
   const roomRef = ref(db, `rooms/${pairId}`);
 
-  // Nejprve zapíšeme identitu hráče (jméno a avatar) do místnosti, aby ji partner mohl přečíst v odmaskování
+  // Nejprve zapíšeme identitu hráče (jméno, avatar a zvíře) do místnosti, aby ji partner mohl přečíst v odmaskování
   const userData = JSON.parse(localStorage.getItem('uhkUser') || sessionStorage.getItem('uhkUser') || '{}');
   if (userData.name) {
     update(ref(db, `rooms/${pairId}/identities/${myPath}`), {
       name: userData.name,
-      avatar: userData.avatar || 'default.svg'
+      avatar: userData.avatar || 'default.svg',
+      animal: animal || userData.animal || (role === 'player1' ? 'Sova' : 'Rys')
     }).then(() => console.log("Moje identita uložena pro reflexi."));
   }
 
@@ -77,7 +78,7 @@ export function initReflection(db, pairId, role, animal) {
     const escapedPlayers = room.actions?.level4_truth?.escapedPlayers || { player1: 'waiting', player2: 'waiting' };
 
     const partnerIdentity = room.identities?.[partnerPath] || { name: 'Tvůj parťák', avatar: 'default.svg' };
-    const partnerAnimal = role === 'player1' ? (room.players?.animal2?.animal || 'Rys') : (room.players?.animal1?.animal || 'Sova');
+    const partnerAnimal = partnerIdentity.animal || (role === 'player1' ? (room.players?.animal2?.animal || 'Rys') : (room.players?.animal1?.animal || 'Sova'));
 
     // Rozhodneme, zda se již odmaskovalo
     const isRevealed = localStorage.getItem(`reveal_${pairId}`) === 'true';

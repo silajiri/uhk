@@ -140,7 +140,7 @@ const testCases = [
     },
     expected: {
       type: "betrayal-one",
-      desc: "⚠️ Rys oklamala Sovu",
+      desc: "⚠️ Rys oklamal Sovu",
       details: "Rys odeslal lež, Sova pravdu. Reakce: ⏳ Sova dosud nezískala správný kód.",
       sChoice: "truth",
       rChoice: "lie",

@@ -88,6 +88,36 @@ export function analyzeRoomBehavior(room) {
   const sReveal = room.revealDecisions?.player1 || '';
   const rReveal = room.revealDecisions?.player2 || '';
 
+  const sAnimal = room.players?.animal1?.animal || 'Sova';
+  const rAnimal = room.players?.animal2?.animal || 'Rys';
+
+  // Verb helpers for proper Czech inflection
+  const getVerb = (animal, verbBase) => {
+    if (animal === 'Sova') {
+      if (verbBase === 'odeslal') return 'odeslala';
+      if (verbBase === 'oklamal') return 'oklamala';
+      if (verbBase === 'získal') return 'získala';
+      if (verbBase === 'sdílel') return 'sdílela';
+      if (verbBase === 'odhalil') return 'odhalila';
+      if (verbBase === 'nezískal') return 'nezískala';
+    }
+    if (animal === 'Rys') {
+      if (verbBase === 'odeslal') return 'odeslal';
+      if (verbBase === 'oklamal') return 'oklamal';
+      if (verbBase === 'získal') return 'získal';
+      if (verbBase === 'sdílel') return 'sdílel';
+      if (verbBase === 'odhalil') return 'odhalil';
+      if (verbBase === 'nezískal') return 'nezískal';
+    }
+    return `${verbBase}(a)`;
+  };
+
+  const getOklamalDesc = (sub, obj) => {
+    if (sub === 'Sova' && obj === 'Rys') return '⚠️ Sova oklamala Rysa';
+    if (sub === 'Rys' && obj === 'Sova') return '⚠️ Rys oklamal Sovu';
+    return `⚠️ ${sub} oklamal(a) partnera (${obj})`;
+  };
+
   let type = 'inprogress'; // 'cooperate' | 'betrayal-one' | 'betrayal-mutual' | 'inprogress'
   let desc = 'Čeká se na rozhodnutí';
   let sChoice = 'none';
@@ -112,23 +142,33 @@ export function analyzeRoomBehavior(room) {
     } else if (sStatus === 'fake' && rStatus === 'fake') {
       type = 'betrayal-mutual';
       desc = '🚨 Vzájemná zrada';
-      const sDecStr = sOutcome === 'trapped' ? 'Sova získala správný kód' : 'Sova nezískala správný kód';
-      const rDecStr = rOutcome === 'trapped' ? 'Rys získal správný kód' : 'Rys nezískal správný kód';
+      const sDecStr = sOutcome === 'trapped' 
+        ? `${sAnimal} ${getVerb(sAnimal, 'získal')} správný kód` 
+        : `${sAnimal} ${getVerb(sAnimal, 'nezískal')} správný kód`;
+      const rDecStr = rOutcome === 'trapped' 
+        ? `${rAnimal} ${getVerb(rAnimal, 'získal')} správný kód` 
+        : `${rAnimal} ${getVerb(rAnimal, 'nezískal')} správný kód`;
       details = `Oba se oklamali. Reakce: ${sDecStr}, ${rDecStr}.`;
     } else if (sStatus === 'fake' && rStatus === 'true') {
       type = 'betrayal-one';
-      desc = '⚠️ Sova oklamala Rysa';
-      const decState = rDecrypted ? '🔓 Rys odhalil lež a získal správný kód' : '⏳ Rys dosud nezískal správný kód';
-      details = `Sova odeslala lež, Rys pravdu. Reakce: ${decState}.`;
+      desc = getOklamalDesc(sAnimal, rAnimal);
+      const decState = rDecrypted 
+        ? `🔓 ${rAnimal} ${getVerb(rAnimal, 'odhalil')} lež a získal správný kód` 
+        : `⏳ ${rAnimal} dosud ${getVerb(rAnimal, 'nezískal')} správný kód`;
+      details = `${sAnimal} ${getVerb(sAnimal, 'odeslal')} lež, ${rAnimal} pravdu. Reakce: ${decState}.`;
     } else if (sStatus === 'true' && rStatus === 'fake') {
       type = 'betrayal-one';
-      desc = '⚠️ Rys oklamala Sovu';
-      const decState = sDecrypted ? '🔓 Sova odhalila lež a získala správný kód' : '⏳ Sova dosud nezískala správný kód';
-      details = `Rys odeslal lež, Sova pravdu. Reakce: ${decState}.`;
+      desc = getOklamalDesc(rAnimal, sAnimal);
+      const decState = sDecrypted 
+        ? `🔓 ${sAnimal} ${getVerb(sAnimal, 'odhalil')} lež a získal správný kód` 
+        : `⏳ ${sAnimal} dosud ${getVerb(sAnimal, 'nezískal')} správný kód`;
+      details = `${rAnimal} ${getVerb(rAnimal, 'odeslal')} lež, ${sAnimal} pravdu. Reakce: ${decState}.`;
     }
   } else if (sShared || rShared) {
     desc = '⏳ Částečné sdílení';
-    details = sShared ? 'Sova již sdílela, Rys vyčkává.' : 'Rys již sdílel, Sova vyčkává.';
+    details = sShared 
+      ? `${sAnimal} již ${getVerb(sAnimal, 'sdílel')}, ${rAnimal} vyčkává.` 
+      : `${rAnimal} již ${getVerb(rAnimal, 'sdílel')}, ${sAnimal} vyčkává.`;
   }
 
   return {
@@ -219,7 +259,7 @@ function getStateLabel(state) {
 }
 
 // Generate the visual output of Level 4 player status and decisions
-function renderL4StatusColumn(sName, sChoice, sOutcome, sReveal, rName, rChoice, rOutcome, rReveal) {
+function renderL4StatusColumn(sAnimal, sName, sChoice, sOutcome, sReveal, rAnimal, rName, rChoice, rOutcome, rReveal) {
   const getChoiceBadge = (choice) => {
     if (choice === 'truth') return '<span class="choice-tag truth">🟢 Pravda</span>';
     if (choice === 'lie') return '<span class="choice-tag lie">🔴 Lež</span>';
@@ -240,12 +280,12 @@ function renderL4StatusColumn(sName, sChoice, sOutcome, sReveal, rName, rChoice,
 
   return `
     <div style="margin-bottom: 0.4rem;">
-      <strong>Sova (${sName}):</strong><br>
+      <strong>${sAnimal} (${sName}):</strong><br>
       ${getChoiceBadge(sChoice)} &nbsp; ${getOutcomeBadge(sOutcome)}<br>
       <small>${getRevealLabel(sReveal)}</small>
     </div>
     <div>
-      <strong>Rys (${rName}):</strong><br>
+      <strong>${rAnimal} (${rName}):</strong><br>
       ${getChoiceBadge(rChoice)} &nbsp; ${getOutcomeBadge(rOutcome)}<br>
       <small>${getRevealLabel(rReveal)}</small>
     </div>
@@ -344,7 +384,7 @@ function renderTable() {
             </div>
           </td>
           <td>
-            ${renderL4StatusColumn(p1Name, behavior.sChoice, behavior.sOutcome, behavior.sReveal, p2Name, behavior.rChoice, behavior.rOutcome, behavior.rReveal)}
+            ${renderL4StatusColumn(sAnimal, p1Name, behavior.sChoice, behavior.sOutcome, behavior.sReveal, rAnimal, p2Name, behavior.rChoice, behavior.rOutcome, behavior.rReveal)}
           </td>
           <td>
             <span class="behavior-badge ${behaviorBadgeClass}">${behavior.desc}</span>
@@ -439,9 +479,13 @@ async function openChatInspector(roomId) {
     const sortedMsgs = Object.values(chatData).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
     let html = '';
+    const sAnimal = room.players?.animal1?.animal || 'Sova';
+    const rAnimal = room.players?.animal2?.animal || 'Rys';
+
     sortedMsgs.forEach(msg => {
       const isSova = msg.sender === 'player1';
       const senderName = isSova ? p1Name : p2Name;
+      const senderAnimal = isSova ? sAnimal : rAnimal;
       const msgClass = isSova ? 'self' : 'partner';
       
       let timeStr = '';
@@ -452,7 +496,7 @@ async function openChatInspector(roomId) {
 
       html += `
         <div class="chat-msg ${msgClass}">
-          <span class="msg-meta">${senderName} (${isSova ? 'Sova' : 'Rys'})</span>
+          <span class="msg-meta">${senderName} (${senderAnimal})</span>
           <span>${escapeHtml(msg.text)}</span>
           <span class="msg-time">${timeStr}</span>
         </div>
@@ -659,9 +703,12 @@ async function exportChatsToCSV() {
 
     const sortedMsgs = Object.values(chatData).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
+    const sAnimal = room.players?.animal1?.animal || 'Sova';
+    const rAnimal = room.players?.animal2?.animal || 'Rys';
+
     sortedMsgs.forEach(msg => {
       const isSova = msg.sender === 'player1';
-      const senderRole = isSova ? 'Sova' : 'Rys';
+      const senderRole = isSova ? sAnimal : rAnimal;
       const senderName = isSova ? p1Name : p2Name;
 
       let timeStr = '';
