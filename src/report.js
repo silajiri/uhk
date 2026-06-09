@@ -199,6 +199,11 @@ function updateKPIs(rooms) {
   let roomsWithL1 = 0;
   let roomsWithL2 = 0;
 
+  let totalL3Attempts = 0;
+  let playersWithL3 = 0;
+  let totalL4GateAttempts = 0;
+  let roomsWithL4Attempts = 0;
+
   roomList.forEach(room => {
     if (room.players?.animal1) totalPlayers++;
     if (room.players?.animal2) totalPlayers++;
@@ -217,6 +222,19 @@ function updateKPIs(rooms) {
       roomsWithL2++;
     }
 
+    // L3 stats
+    const l3b = room.actions?.level3_bridge || {};
+    const stats1 = l3b.stats?.player1 || {};
+    const stats2 = l3b.stats?.player2 || {};
+    if (typeof stats1.attemptsUsed === 'number') {
+      totalL3Attempts += stats1.attemptsUsed;
+      playersWithL3++;
+    }
+    if (typeof stats2.attemptsUsed === 'number') {
+      totalL3Attempts += stats2.attemptsUsed;
+      playersWithL3++;
+    }
+
     // L4 behaviors
     const l4 = room.actions?.level4_truth || {};
     if (l4.sovaShared) {
@@ -226,6 +244,12 @@ function updateKPIs(rooms) {
     if (l4.rysShared) {
       totalL4Choices++;
       if (l4.rysShardStatus === 'true') totalL4Coops++;
+    }
+
+    // L4 gate code attempts
+    if (typeof l4.attempts === 'number') {
+      totalL4GateAttempts += l4.attempts;
+      roomsWithL4Attempts++;
     }
   });
 
@@ -244,6 +268,14 @@ function updateKPIs(rooms) {
 
   const avgL2 = roomsWithL2 > 0 ? (totalL2WarmthResets / roomsWithL2).toFixed(1) : '0.0';
   document.getElementById('kpi-avg-errors-l2').textContent = avgL2;
+
+  const avgL3 = playersWithL3 > 0 ? (totalL3Attempts / playersWithL3).toFixed(1) : '0.0';
+  const kpiL3El = document.getElementById('kpi-avg-attempts-l3');
+  if (kpiL3El) kpiL3El.textContent = avgL3;
+
+  const avgL4 = roomsWithL4Attempts > 0 ? (totalL4GateAttempts / roomsWithL4Attempts).toFixed(1) : '0.0';
+  const kpiL4El = document.getElementById('kpi-avg-attempts-l4');
+  if (kpiL4El) kpiL4El.textContent = avgL4;
 }
 
 // Translate state string to Czech human readable name
@@ -530,32 +562,37 @@ function exportStatsToCSV() {
 
   // Header row matching requested behavior metrics
   const headers = [
+    // 1. Identifikace místnosti a žáků
     'Místnost ID',
     'Stav hry',
-    'Sova - Jméno',
-    'Sova - Email',
-    'Sova - L3 Most Úspěch',
-    'Sova - L3 Most Pokusy',
-    'Sova - L3 Most Podpory',
-    'Sova - L3 Most Výsměchy',
-    'Sova - L3 Most Reakce',
-    'Sova - L4 Brána Volba',
-    'Sova - L4 Brána Výsledek',
-    'Sova - Odhalení',
-    'Rys - Jméno',
-    'Rys - Email',
-    'Rys - L3 Most Úspěch',
-    'Rys - L3 Most Pokusy',
-    'Rys - L3 Most Podpory',
-    'Rys - L3 Most Výsměchy',
-    'Rys - L3 Most Reakce',
-    'Rys - L4 Brána Volba',
-    'Rys - L4 Brána Výsledek',
-    'Rys - Odhalení',
-    'L4 Kooperační scénář',
-    'L4 Popis chování',
+    'Hráč 1 (Sova) - Jméno',
+    'Hráč 1 (Sova) - Email',
+    'Hráč 2 (Rys) - Jméno',
+    'Hráč 2 (Rys) - Email',
+    // 2. Level 1 & Level 2 chybovost
     'L1 Bludiště - Pády',
     'L2 Vánice - Resety',
+    // 3. Level 3 (Skleněný most)
+    'Hráč 1 (Sova) - L3 Most Úspěch',
+    'Hráč 1 (Sova) - L3 Most Pokusy',
+    'Hráč 1 (Sova) - L3 Most Podpory',
+    'Hráč 1 (Sova) - L3 Most Výsměchy',
+    'Hráč 1 (Sova) - L3 Most Reakce',
+    'Hráč 2 (Rys) - L3 Most Úspěch',
+    'Hráč 2 (Rys) - L3 Most Pokusy',
+    'Hráč 2 (Rys) - L3 Most Podpory',
+    'Hráč 2 (Rys) - L3 Most Výsměchy',
+    'Hráč 2 (Rys) - L3 Most Reakce',
+    // 4. Level 4 (Brána pravdy)
+    'Hráč 1 (Sova) - L4 Brána Volba',
+    'Hráč 1 (Sova) - L4 Brána Výsledek',
+    'Hráč 2 (Rys) - L4 Brána Volba',
+    'Hráč 2 (Rys) - L4 Brána Výsledek',
+    'L4 Kooperační scénář',
+    'L4 Popis chování',
+    // 5. Reflexe
+    'Hráč 1 (Sova) - Odhalení',
+    'Hráč 2 (Rys) - Odhalení',
     'Celkem zpráv v reflexi'
   ];
 
@@ -629,32 +666,37 @@ function exportStatsToCSV() {
     if (behavior.type === 'betrayal-mutual') scenario = 'Vzájemná zrada';
 
     rows.push([
+      // 1. Identifikace
       roomId,
       getStateLabel(state),
       p1Name,
       p1Email,
+      p2Name,
+      p2Email,
+      // 2. L1 & L2 chybovost
+      l1Resets,
+      l2Resets,
+      // 3. L3
       sBridgeSuccess,
       sBridgeAtt,
       sSupport,
       sHate,
       sFinal,
-      choiceSova,
-      outcomeSova,
-      revealSova,
-      p2Name,
-      p2Email,
       rBridgeSuccess,
       rBridgeAtt,
       rSupport,
       rHate,
       rFinal,
+      // 4. L4
+      choiceSova,
+      outcomeSova,
       choiceRys,
       outcomeRys,
-      revealRys,
       scenario,
       behavior.desc + ' - ' + behavior.details,
-      l1Resets,
-      l2Resets,
+      // 5. Reflexe
+      revealSova,
+      revealRys,
       chatCount
     ]);
   });
