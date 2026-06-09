@@ -23,7 +23,9 @@ const ADMIN_EMAILS = [
   'silatereza@gmail.com',
   'tereza.silova@zsjrk.cz',
   'jiri.janovec@zsjrk.cz',
-  'jirijanovec@zsjrk.cz'
+  'jirijanovec@zsjrk.cz',
+  'sila.jiri@zsmslipa.cz',
+  'jiri.sila@zsmslipa.cz'
   // TODO: Add more admin emails here
 ];
 

@@ -22,6 +22,8 @@ const db = getDatabase(app);
 let studentProfiles = [];
 let roomsData = {}; // Store raw Firebase rooms data
 let filteredRoomIds = []; // Filtered room IDs
+let isDatabaseLoaded = false;
+let databaseError = null;
 
 // Authenticate and verify Admin role
 function checkAdminAccess() {
@@ -329,6 +331,32 @@ function renderTable() {
   const tbody = document.getElementById('rooms-table-body');
   const countEl = document.getElementById('table-row-count');
   if (!tbody) return;
+
+  if (databaseError) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" style="text-align: center; padding: 2rem; color: var(--error); background: rgba(231,76,60,0.05);">
+          Chyba při načítání dat z Firebase Realtime Database: ${databaseError.message}<br>
+          <small>Ujistěte se, že jste přihlášeni jako administrátor s odpovídajícím oprávněním.</small>
+        </td>
+      </tr>
+    `;
+    if (countEl) countEl.textContent = 'Zobrazeno 0 místností';
+    return;
+  }
+
+  if (!isDatabaseLoaded) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" style="text-align: center; padding: 2rem; color: var(--muted);">
+          <div class="spinner" style="margin-bottom: 0.5rem;"></div><br>
+          Načítám data z Firebase a profily žáků...
+        </td>
+      </tr>
+    `;
+    if (countEl) countEl.textContent = 'Zobrazeno 0 místností';
+    return;
+  }
 
   const searchVal = document.getElementById('search-input').value.toLowerCase().trim();
   const stateFilter = document.getElementById('filter-state').value;
@@ -839,6 +867,8 @@ export async function initializeReport() {
 
   const roomsRef = ref(db, 'rooms');
   onValue(roomsRef, (snapshot) => {
+    isDatabaseLoaded = true;
+    databaseError = null;
     const data = snapshot.val();
     roomsData = data || {};
     
@@ -849,16 +879,8 @@ export async function initializeReport() {
     renderTable();
   }, (err) => {
     console.error("Chyba při načítání dat místností:", err);
-    const tbody = document.getElementById('rooms-table-body');
-    if (tbody) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="9" style="text-align: center; padding: 2rem; color: var(--error); background: rgba(231,76,60,0.05);">
-            Chyba při načítání dat z Firebase Realtime Database: ${err.message}<br>
-            <small>Ujistěte se, že jste přihlášeni jako administrátor s odpovídajícím oprávněním.</small>
-          </td>
-        </tr>
-      `;
-    }
+    isDatabaseLoaded = true;
+    databaseError = err;
+    renderTable();
   });
 }
