@@ -22,6 +22,8 @@ Stavy místnosti (`state`):
 - `level4` – zadání 5místné brány pravdy ze sdílených úlomků (původní level3)
 - `reflection` – závěrečná reflexe a real-time chat po odmaskování (odemyká učitel)
 
+Při přechodu z `level4` do `reflection` se vyžaduje explicitní potvrzení výsledku oběma hráči (kliknutím na tlačítko *„Rozumím, pokračovat k reflexi ➔“*), což nastaví příslušné flagy v `actions/level4_truth/ready/player1` a `player2` na `true`. Teprve po potvrzení obou hráčů dojde k přesunu do reflexního stavu.
+
 Klientská logika:
 - **Matchmaking:** Probíhá přes Google Workspace přihlášení. Klientský kód zavolá HTTPS Cloud Function `lookupMappingByEmail` na `https://europe-west1-uhk-game.cloudfunctions.net/lookupMappingByEmail`. Funkce bezpečně dohledá e-mail ve `/profiles` a `/mappings` a vrátí payload s `pairId`, zvířetem (`animal`), rolí (`player1`/`player2`), avatarem a skutečným jménem.
 - **Připojení (Presence):** Klient se zapíše na `/rooms/{pairId}/players/animal1` (Sova) nebo `animal2` (Rys) jako `status: "online"` a `lastSeen: serverTimestamp()`.
@@ -96,11 +98,13 @@ Skutečné rozvržení Realtime Database:
       "identities": {
         "animal1": {
           "name": "Jan Novák",
-          "avatar": "lion.svg"
+          "avatar": "lion.svg",
+          "animal": "Sova"
         },
         "animal2": {
           "name": "Petr Svoboda",
-          "avatar": "elephant.svg"
+          "avatar": "elephant.svg",
+          "animal": "Rys"
         }
       },
       "config": {
@@ -183,6 +187,10 @@ Skutečné rozvržení Realtime Database:
           "escapedPlayers": {
             "player1": "waiting" | "escaped" | "trapped",
             "player2": "waiting" | "escaped" | "trapped"
+          },
+          "ready": {
+            "player1": true | false,
+            "player2": true | false
           }
         }
       },
@@ -243,11 +251,14 @@ Zajišťují, že běžní žáci nemohou zjistit identitu svého partnera před
 
 ---
 
-## E. Administrátorské rozhraní (Teacher Dashboard)
+## E. Administrátorské rozhraní (Teacher Dashboard) a Reportování
 
-Učitelské UI (`admin.html`) slouží pro přípravu, konfiguraci a živý monitoring:
+Učitelské UI (`admin.html` a `report.html`) slouží pro přípravu, konfiguraci, živý monitoring a reportování:
 1. **Import dat:** Umožňuje importovat profily studentů a definovat pevné dvojice studentů. Ukládá data do `/profiles` a `/mappings` přes zabezpečené Cloud Function endpointy.
 2. **Konfigurace Levelu 3:** Nastavení velikosti hrací plochy, času zobrazení a počtu pochozích dlaždic.
 3. **Live Monitoring:** Zobrazuje v reálném čase tabulku všech vytvořených místností, jejich stav online/offline a aktuální herní fázi (Level 1 až 4 a Reflexe).
-4. **Globální řízení:** Tlačítko pro odemčení reflexe, které uvolní skutečná jména pro všechny místnosti naráz.
-5. **Manuální restart:** Možnost restartovat konkrétní místnost v případě chyb nebo odpojení žáků.
+4. **Live KPIs:** Zobrazuje statistiky v reálném čase v horním panelu reportu: celkový počet místností, celkový počet hráčů, míra kooperace v L4 a průměrná chybovost v L1 (bludiště) a L2 (teplo), plus nově průměrné počty pokusů na Skleněném mostě (L3) a u Brány pravdy (L4).
+5. **Asynchronní načítání profilů:** V panelu výsledků se profily studentů načítají asynchronně na pozadí, což zajišťuje okamžité navázání Firebase spojení a zobrazení herních výsledků (s e-mailovými fallbacky) bez blokování rozhraní v případě pomalé Cloud Function.
+6. **Chronologický export do CSV:** Možnost exportovat kompletní herní výsledky a statistiky do CSV s logicky seřazenými sloupci v pořadí: Identifikace, Level 1 & Level 2 chybovost, Level 3 (Skleněný most - pokusy, podpory/výsměchy), Level 4 (Brána pravdy - volby, výsledky), Reflexe (odhalení, celkem zpráv).
+7. **Globální řízení:** Tlačítko pro odemčení reflexe, které uvolní skutečná jména pro všechny místnosti naráz.
+8. **Manuální restart:** Možnost restartovat konkrétní místnost v případě chyb nebo odpojení žáků.

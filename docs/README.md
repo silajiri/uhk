@@ -11,8 +11,8 @@
 *   **Hosting:** GitHub Pages (statický web).
 *   **Backend / Databáze:** Firebase Realtime Database (pro synchronizaci stavu hry a pozic v reálném čase, Web SDK verze 11).
 *   **Systém identit (Zvířecí přezdívky):**
-    * Žáci se nepřihlašují jmény, ale vystupují pod zvířecími rolemi (Sova jako player1, Rys jako player2).
-*   **Zobrazení rolí:** Role jsou jasně zobrazeny v horním topbaru (`Role: SOVA` / `Role: RYS`) včetně svítícího lemu avataru (modrý lem pro Sovu, oranžový pro Rysa) a na teploměrech.
+    * Žáci se nepřihlašují jmény, ale vystupují pod zvířecími rolemi (výchozí Sova jako player1, Rys jako player2, nebo jiné zvířecí přezdívky dle Matchmakingu).
+*   **Zobrazení rolí:** Role jsou jasně zobrazeny v horním topbaru (`Jsi: [Zvíře]`) včetně svítícího lemu avataru (modrý lem pro player1, oranžový pro player2) a na teploměrech.
 *   **Anonymní dvojice:** Žáci jsou automaticky párováni do anonymních dvojic podle pevného klíče zadaného učitelem v admin panelu.
 
 ## 3. Datová struktura a Matchmaking
@@ -23,24 +23,26 @@
 ## 4. Uživatelský průchod (User Flow)
 Hra je rozdělena do dvou fází:
 1.  **Fáze 1: Anonymní spolupráce (Akce)**
-    *   Hráči plní 4 asymetrické úrovně, neznají své skutečné identity a vidí se pouze jako „Sova“ a „Rys“.
+    *   Hráči plní 4 asymetrické úrovně, neznají své skutečné identity a vidí se pouze pod zvířecími přezdívkami.
     *   Všechny herní akce (pohyby, signály, střídání krystalů, kliky na dlaždice, podpora/hate) se synchronizují v reálném čase a logují.
+    *   **Synchronizace přechodu do reflexe:** Po dokončení Levelu 4 se hráčům zobrazí karta s výsledkem brány a tlačítko potvrzení. Hra přejde do reflexe až v okamžiku, kdy oba hráči potvrdí dokončení kliknutím na *„Rozumím, pokračovat k reflexi ➔“*.
     *   **Zákaz odhlášení:** Pro zajištění plynulosti a zamezení rozpadu dvojic během hry bylo odstraněno tlačítko pro odhlášení z klientského rozhraní.
 2.  **Fáze 2: Integrovaná reflexe (Aha-moment)**
-    *   Po úspěšném splnění všech úrovní čekají žáci na uvolnění reflexe učitelem.
+    *   Po úspěšném splnění všech úrovní a potvrzení obou hráčů čekají žáci na uvolnění reflexe učitelem.
     *   Zobrazí se přehled statistik (počet pádů v Levelu 1, pokusů v Levelu 3 a 4).
     *   Ujištění o bezpečí třídy a případné ocenění za podporu na mostě.
     *   Kliknutím na tlačítko se animací 3D otočení karty odhalí skutečné jméno spolužáka a jeho avatar s textem *„Tento hráč ti věřil, i když tě neviděl.“*
-    *   Otevře se **volný real-time chat**, kde si žáci mohou vyměnit pocity a poděkovat si.
+    *   Otevře se **volný real-time chat**, kde si žáci mohou vyměnit pocity a poděkovat si pod svými skutečnými jmény.
 
 ## 5. Herní úrovně
 
 *   **Level 1: Spolehnutí ve tmě** (Téma: Důvěra a přebírání odpovědnosti)
     *   Mřížka 10x10 se generuje procedurálně (náhodný start, cíl s Manhattan vzdáleností >= 6, 24 zdí a 6 pastí s BFS validací cesty).
-    *   Sova (Navigátor) vidí celou mapu lesa a navigační tlačítka v rozvržení šipek klávesnice. Rys (Slepý poutník) vidí jen tmu a svůj bod, pohybuje se šipkami na klávesnici na základě velkých blikajících signálů.
-    *   Kolize s pastí vrátí Rysa na start, zablokuje Sovu a vyvolá na obrazovce Rysa modal o srážce vyžadující potvrzení.
+    *   Navigátor (player1, např. Sova) vidí celou mapu lesa a navigační tlačítka v rozvržení šipek klávesnice. Slepý poutník (player2, např. Rys) vidí jen tmu a svůj bod, pohybuje se šipkami na klávesnici na základě velkých blikajících signálů.
+    *   Kolize s pastí vrátí poutníka na start, zablokuje navigátora a vyvolá na obrazovce poutníka modal o srážce vyžadující potvrzení.
+    *   Po úspěšném dosažení cíle se zobrazí přechodová karta, kde jsou texty o úspěchu generovány dynamicky s použitím zvířecích přezdívek hráčů (namísto statických rolí Sova a Rys).
 *   **Level 2: Sdílené teplo** (Téma: Ohleduplnost a střídání zdrojů)
-    *   Ukazatele tepla Sovy a Ryse klesají tomu, kdo nemá krystal (-4 %/s v druhé fázi), a rostou držiteli (+2 %/s). Barva se mění od červené přes zelenou po ledově modrou.
+    *   Ukazatele tepla player1 a player2 klesají tomu, kdo nemá krystal (-4 %/s v druhé fázi), a rostou držiteli (+2 %/s). Barva se mění od červené přes zelenou po ledově modrou.
     *   Hráči si musí krystal střídat a přežít **120 sekund**.
     *   Mrznoucí hráč posílá signál „Mrznu!“, který držiteli krystalu zobrazí blikající varovný slide-down banner.
     *   Pokud teplota klesne na 0 %, level se resetuje a oběma se zobrazí velký modal o zmrznutí a resetu času zpět na 120s.
@@ -50,7 +52,7 @@ Hra je rozdělena do dvou fází:
     *   Při chybě se pokus resetuje. Hráč má 3 pokusy. Na konci pokusů (ať už úspěchu, či neúspěchu) musí parťák povinně zvolit finální reakci (👏 nebo 😂), aby hra pokračovala.
     *   Pokud aktivní hráč po 3 pokusech neuspěje, role se prohodí na nově vygenerovaném mostě.
 *   **Level 4: Kód pravdy** (Téma: Upřímnost a preciznost)
-    *   Brána je uzamčena 5místným kódem. Sova vidí začátek (např. `AB---`), Rys konec (např. `--CDE`).
+    *   Brána je uzamčena 5místným kódem. Hráč 1 vidí začátek (např. `AB---`), Hráč 2 konec (např. `--CDE`). Role i vizuální zobrazení přebírají dynamické zvířecí přezdívky a avatary.
     *   Hráči si musí úlomky nasdílet tlačítkem přímého přenosu (lze poslat pravdu či lež), složit kód dohromady a zadat ho.
     *   Při 3 chybách se kód změní, úlomky se regenerují a zobrazí se modal o resetu. Propuštění/uvěznění závisí na poctivosti odeslaného úlomku.
 

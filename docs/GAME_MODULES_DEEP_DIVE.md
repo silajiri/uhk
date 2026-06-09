@@ -69,7 +69,11 @@ Pokud Rys stoupne na past (hodnota 2):
 1. Pozice hráče se resetuje na startovní pozici.
 2. Hodnota `resetCount` v DB se inkrementuje o 1.
 3. Sově se na 3 sekundy zablokuje navigační pult.
-4. Rysovi se zobrazí modal s chybou *„⚠️ Pád do pasti! Rys narazil na neviditelnou překážku a vrací se na začátek lesa.“*, který must potvrdit kliknutím na *„🏃 Rozumím, zkusit znovu“*.
+4. Rysovi se zobrazí modal s chybou *„⚠️ Pád do pasti! Rys narazil na neviditelnou překážku a vrací se na začátek lesa.“*, který musí potvrdit kliknutím na *„🏃 Rozumím, zkusit znovu“*.
+
+### E. Podmínka dokončení a přechod
+* **Úspěch:** Poutník (player2) dosáhne cílové dlaždice (hodnota 3).
+* **Přechod:** Oběma hráčům se zobrazí přechodová karta s textem: *„Cíl dosažen! Společně jste ruku v ruce bezpečně prošli temným lesem. [Jméno Hráče 1] vedl(a) s rozvahou a [Jméno Hráče 2] projevil(a) hlubokou důvěru.“*. Zvířecí přezdívky obou hráčů se načítají dynamicky z databáze na základě matchmakingu. Pokračování do další úrovně se aktivuje kliknutím na tlačítko *„Pokračovat do další úrovně ➔“*.
 
 ---
 
@@ -150,6 +154,7 @@ Pokud mrznoucí hráč klikne na *„Mrznu!“*, zapíše se signál do DB. Na o
 
 ### A. Vizuální rozvržení (UI/UX)
 - Zobrazuje se uzamčená kamenná brána s 5 prázdnými sloty pro výsledný kód (runové sloty, které po vyplnění svítí zlatě) a digitální klávesnicí na displeji.
+- V záhlaví se zobrazuje dynamická zvířecí přezdívka hráče a jeho kruhový avatar. Instrukční modal a titulek role se dynamicky přizpůsobují přiděleným přezdívkám (např. „Medvěd (Brána pravdy)“).
 - Každý hráč vidí v boxu **„Tvůj úlomek“** část kódu, zbytek je nahrazen pomlčkami.
 - Pod ním jsou dvě tlačítka pro volbu sdílení:
   - `🟢 Odeslat pravdu` – Odešle partnerovi skutečný úlomek.
@@ -158,7 +163,7 @@ Pokud mrznoucí hráč klikne na *„Mrznu!“*, zapíše se signál do DB. Na o
 
 ### B. Algoritmus sdílení a přímé zobrazení
 1. Kód se generuje náhodně z povolených znaků `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`.
-2. Sova vidí fragment složený z prvních dvou znaků (např. `AB---`), Rys vidí fragment s posledními třemi znaky (např. `--CDE`).
+2. Hráč 1 vidí fragment složený z prvních dvou znaků (např. `AB---`), Hráč 2 vidí fragment s posledními třemi znaky (např. `--CDE`).
 3. Po stisknutí jednoho z tlačítek se zapíše stav sdílení (`sovaShared` / `rysShared` = `true`), hodnota úlomku (skutečná/falešná) a status pravosti (`sovaShardStatus` / `rysShardStatus` = `'true'` / `'fake'`) do databáze pod `actions/level4_truth`.
 4. Jakmile partner sdílí svůj úlomek, zobrazí se okamžitě a bez jakéhokoliv ověřování v boxu „Úlomek parťáka“.
 5. Hráči nemají k dispozici žádný detektor lži ani dešifrování. Zda byl kód správný, zjistí až při pokusu o aktivaci brány. Pokud partner odeslal lež (podvrh), brána se neotevře, pokus se započítá jako neúspěšný a hráči musí komunikovat a vyjednávat.
@@ -176,6 +181,10 @@ Při odeslání správného kódu brána vyhodnotí status hráče:
 - Pokud hráč **sám poslal pravdu**, brána ho propustí a úspěšně uniká z lesa (`escaped`). Zobrazí se celoobrazovková karta úspěchu se zeleným zářícím tónem a symbolem `✨`.
 - Pokud hráč **poslal lež (podvrh)**, brána jeho zradu odhalí, zablokuje se a uvězní ho v lese (`trapped`). Zobrazí se celoobrazovková karta s mříží, červeným tónem a symbolem `🔒`.
 
+### E. Synchronizace přechodu do reflexe
+1. **Potvrzení výsledku:** Na kartě výsledku (Útěk / Uvěznění) se oběma hráčům zobrazí tlačítko *„Rozumím, pokračovat k reflexi ➔“*.
+2. **Podmínka pokračování:** Kliknutím na toto tlačítko zapíše každý hráč svůj stav připravenosti (`ready: true`) do databáze. Teprve v okamžiku, kdy oba hráči potvrdí pokračování (`ready.player1 && ready.player2 === true`), se stav místnosti přepne do stavu `reflection`. Tím je zamezeno automatickému přesměrování a je poskytnut čas na přečtení morálního vyhodnocení.
+
 ---
 
 ## 4.6 Modul Post-Game Reflection a Velké odhalení
@@ -188,7 +197,7 @@ Teprve když učitel v administraci klikne na tlačítko *„Odemknout reflexi�
 
 ### B. Krok 1: Statistika a spuštění odmaskování
 1. Zobrazí se statistická karta s informacemi o spolupráci (pády v L1, statistiky mostu v L3 – počet podpor/hatů a finální reakce, a pokusy v L4).
-2. Hráč vidí, se kterým anonymním zvířetem hrál.
+2. Hráč vidí, se kterým anonymním zvířetem hrál (načítá se dynamicky z partnerova profilu v `/identities/`).
 3. Kliknutím na tlačítko **„🔍 Odhalit skutečné jméno partnera“** se provede 3D otočení karty spolužáka a zasypání obrazovky konfetami.
 
 ### C. Krok 2: Vzkaz o bezpečí a Ocenění podpory
