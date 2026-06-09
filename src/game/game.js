@@ -143,7 +143,7 @@ export function initGameRouter(db, pairId, role, animal, avatar) {
         const btn4 = document.getElementById('btn-transition-continue');
         if (btn4) {
           btn4.onclick = () => {
-            initLevel4(db, pairId, role);
+            initLevel4(db, pairId, role, animal, avatar);
           };
         }
         break;

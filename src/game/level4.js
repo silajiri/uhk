@@ -1,6 +1,6 @@
 import { ref, onValue, set, update, get } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js';
 
-export function initLevel4(db, pairId, role) {
+export function initLevel4(db, pairId, role, animal, avatar) {
   const isSova = (role === 'player1');
   const root = document.getElementById('game-root');
   const dataRef = ref(db, `rooms/${pairId}/actions/level4_truth`);
@@ -9,12 +9,16 @@ export function initLevel4(db, pairId, role) {
   let currentData = null;
   let currentFakeFragment = null;
 
+  const myAnimal = animal || (isSova ? 'Sova' : 'Rys');
+  const myAvatar = avatar || 'default.svg';
+
   // UI Konstrukce
   root.innerHTML = `
     <div id="level4-container">
       <div class="role-indicator-header" style="text-align: center; margin-bottom: 0.8rem; font-family: 'Fredoka', 'Segoe UI', sans-serif;">
-        <span style="background: var(--primary); color: white; padding: 0.4rem 1.2rem; border-radius: 20px; font-size: 1rem; font-weight: bold; box-shadow: var(--shadow); border: 2px solid rgba(255, 255, 255, 0.1); display: inline-block;">
-          Jsi: ${isSova ? '🦉 SOVA (Brána pravdy)' : '🐾 RYS (Brána pravdy)'}
+        <span style="background: var(--primary); color: white; padding: 0.4rem 1.2rem; border-radius: 20px; font-size: 1rem; font-weight: bold; box-shadow: var(--shadow); border: 2px solid rgba(255, 255, 255, 0.1); display: inline-flex; align-items: center; gap: 8px; justify-content: center;">
+          <img src="assets/avatars/${myAvatar}" alt="Avatar" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1.5px solid rgba(255,255,255,0.4);" />
+          <span>Jsi: <strong style="color: ${isSova ? 'var(--sova-color, #3498db)' : 'var(--rys-color, #e67e22)'}">${myAnimal}</strong> (Brána pravdy)</span>
         </span>
       </div>
       <div class="level-instructions" style="display: none;"></div>
@@ -51,8 +55,8 @@ export function initLevel4(db, pairId, role) {
   const attemptsEl = document.getElementById('attempts-info');
 
   // Zobrazení instrukcí jako modal ke schválení (vhodné pro pomalu čtoucí žáky)
-  const title = isSova ? "Sova (Brána pravdy)" : "Rys (Brána pravdy)";
-  const text = "Tvoje role v této úrovni: <strong style='color: " + (isSova ? "var(--sova-color, #3498db)" : "var(--rys-color, #e67e22)") + "; font-size: 1.3rem;'>" + (isSova ? "🦉 SOVA (Brána pravdy)" : "🐾 RYS (Brána pravdy)") + "</strong>.<br><br>" +
+  const title = `${myAnimal} (Brána pravdy)`;
+  const text = `Tvoje role v této úrovni: <strong style='color: ${isSova ? "var(--sova-color, #3498db)" : "var(--rys-color, #e67e22)"}; font-size: 1.3rem;'>${myAnimal} (Brána pravdy)</strong>.<br><br>` +
     "Brána z lesa je uzamčena 5místným kódem. Každý z vás vidí pouze část kódu a zbytek má skrytý pod pomlčkami.<br><br>" +
     "1. Rozhodni se, zda budeš spolupracovat: Můžeš poslat pravdivý úlomek, nebo parťáka oklamat a poslat falešný (lež).<br>" +
     "2. Jakmile ti partner pošle svůj úlomek, uvidíš ho v pravém boxu.<br>" +
@@ -163,33 +167,70 @@ export function initLevel4(db, pairId, role) {
   }
 
   // Funkce pro zobrazení výsledkové obrazovky
-  function showOutcomeScreen(status) {
+  function showOutcomeScreen(status, partnerStatus, readyState) {
     const container = document.getElementById('level4-container');
     if (!container) return;
-    if (container.querySelector('.gate-outcome-card')) return; // Zamezení zbytečného přepisování
 
+    const ready = readyState || { player1: false, player2: false };
+    const myReady = isSova ? ready.player1 : ready.player2;
+    const partnerFinished = partnerStatus && partnerStatus !== 'waiting';
+
+    const stateStr = `${status}_${partnerFinished}_${myReady}`;
+    if (container.dataset.outcomeState === stateStr) {
+      return;
+    }
+    container.dataset.outcomeState = stateStr;
+
+    let outcomeHtml = "";
     if (status === 'escaped') {
-      container.innerHTML = `
-        <div class="gate-outcome-card escaped">
-          <div class="gate-outcome-icon">✨</div>
-          <h2 style="color: #2ecc71; margin-bottom: 1rem;">Úspěšný únik!</h2>
-          <p style="font-size: 1.1rem; line-height: 1.6;">Brána tě propustila z Mlžného lesa. Choval ses čestně, a proto jsi volný.</p>
-          <div style="font-size: 0.95rem; color: var(--muted); margin-top: 1.5rem;">
-            Čekání na dokončení druhého hráče...
-          </div>
-        </div>
+      outcomeHtml = `
+        <div class="gate-outcome-icon">✨</div>
+        <h2 style="color: #2ecc71; margin-bottom: 1rem;">Úspěšný únik!</h2>
+        <p style="font-size: 1.1rem; line-height: 1.6;">Brána tě propustila z Mlžného lesa. Choval ses čestně, a proto jsi volný.</p>
       `;
     } else if (status === 'trapped') {
-      container.innerHTML = `
-        <div class="gate-outcome-card trapped">
-          <div class="gate-outcome-icon">🔒</div>
-          <h2 style="color: #e74c3c; margin-bottom: 1rem;">Byl jsi uvězněn!</h2>
-          <p style="font-size: 1.1rem; line-height: 1.6;">Pokusil ses oklamat parťáka zasláním falešného kódu. Starobylá brána odhalila tvou zradu a navždy tě zablokovala v lese.</p>
-          <div style="font-size: 0.95rem; color: var(--muted); margin-top: 1.5rem;">
-            Čekání na dokončení druhého hráče...
-          </div>
+      outcomeHtml = `
+        <div class="gate-outcome-icon">🔒</div>
+        <h2 style="color: #e74c3c; margin-bottom: 1rem;">Byl jsi uvězněn!</h2>
+        <p style="font-size: 1.1rem; line-height: 1.6;">Pokusil ses oklamat parťáka zasláním falešného kódu. Starobylá brána odhalila tvou zradu a navždy tě zablokovala v lese.</p>
+      `;
+    }
+
+    let footerHtml = "";
+    if (!partnerFinished) {
+      footerHtml = `
+        <div style="font-size: 0.95rem; color: var(--muted); margin-top: 1.5rem;">
+          Čekání na dokončení druhého hráče...
         </div>
       `;
+    } else if (myReady) {
+      footerHtml = `
+        <div style="font-size: 0.95rem; color: var(--muted); margin-top: 1.5rem;">
+          Čekání na partnera, až potvrdí pokračování...
+        </div>
+      `;
+    } else {
+      footerHtml = `
+        <div style="margin-top: 1.8rem;">
+          <button id="btn-outcome-confirm" class="btn-crystal" style="width: 100%; padding: 1.1rem; font-size: 1.15rem; font-weight: 700; cursor: pointer; border-radius: 18px;">
+            Rozumím, pokračovat k reflexi ➔
+          </button>
+        </div>
+      `;
+    }
+
+    container.innerHTML = `
+      <div class="gate-outcome-card ${status}">
+        ${outcomeHtml}
+        ${footerHtml}
+      </div>
+    `;
+
+    const btn = document.getElementById('btn-outcome-confirm');
+    if (btn) {
+      btn.onclick = () => {
+        set(ref(db, `rooms/${pairId}/actions/level4_truth/ready/${isSova ? 'player1' : 'player2'}`), true);
+      };
     }
   }
 
@@ -237,15 +278,13 @@ export function initLevel4(db, pairId, role) {
     const partnerStatus = isSova ? escapedPlayers.player2 : escapedPlayers.player1;
 
     if (myStatus && myStatus !== 'waiting') {
-      showOutcomeScreen(myStatus);
+      showOutcomeScreen(myStatus, partnerStatus, data.ready);
 
-      // Sova controls transition
-      if (isSova && partnerStatus && partnerStatus !== 'waiting') {
-        if (!transitionTimerStarted) {
-          transitionTimerStarted = true;
-          setTimeout(() => {
-            set(ref(db, `rooms/${pairId}/state`), 'reflection');
-          }, 4000);
+      // Sova controls transition to reflection when BOTH are ready
+      if (isSova) {
+        const ready = data.ready || { player1: false, player2: false };
+        if (ready.player1 && ready.player2) {
+          set(ref(db, `rooms/${pairId}/state`), 'reflection');
         }
       }
       return; // Skip normal UI updates since we are showing outcome
@@ -358,6 +397,10 @@ function generateLevel4Data() {
     escapedPlayers: {
       player1: 'waiting',
       player2: 'waiting'
+    },
+    ready: {
+      player1: false,
+      player2: false
     }
   };
 }
