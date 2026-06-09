@@ -54,11 +54,11 @@ export function initLevel4(db, pairId, role) {
   const title = isSova ? "Sova (Brána pravdy)" : "Rys (Brána pravdy)";
   const text = "Tvoje role v této úrovni: <strong style='color: " + (isSova ? "var(--sova-color, #3498db)" : "var(--rys-color, #e67e22)") + "; font-size: 1.3rem;'>" + (isSova ? "🦉 SOVA (Brána pravdy)" : "🐾 RYS (Brána pravdy)") + "</strong>.<br><br>" +
     "Brána z lesa je uzamčena 5místným kódem. Každý z vás vidí pouze část kódu a zbytek má skrytý pod pomlčkami.<br><br>" +
-    "1. **Rozhodni se, zda budeš spolupracovat:** Můžeš poslat pravdivý úlomek, nebo parťáka oklamat a poslat falešný (lež).<br>" +
+    "1. Rozhodni se, zda budeš spolupracovat: Můžeš poslat pravdivý úlomek, nebo parťáka oklamat a poslat falešný (lež).<br>" +
     "2. Jakmile ti partner pošle svůj úlomek, uvidíš ho v pravém boxu.<br>" +
-    "3. **Složte kód dohromady**, vyťukejte ho a aktivujte bránu.";
+    "3. Složte kód dohromady, vyťukejte ho a aktivujte bránu.";
   showInstructionsModal(title, text);
-  
+
   let enteredCode = "";
   let currentFullCode = "";
   let currentAttempts = 0;
@@ -69,7 +69,7 @@ export function initLevel4(db, pairId, role) {
     get(dataRef).then(snap => {
       const data = snap.val();
       const needsInit = !snap.exists() || !data || !data.fullCode || !data.sovaFragment || !data.rysFragment ||
-                        (data.escapedPlayers && (data.escapedPlayers.player1 !== 'waiting' || data.escapedPlayers.player2 !== 'waiting'));
+        (data.escapedPlayers && (data.escapedPlayers.player1 !== 'waiting' || data.escapedPlayers.player2 !== 'waiting'));
       if (needsInit) {
         set(dataRef, generateLevel4Data());
       } else {
@@ -111,35 +111,35 @@ export function initLevel4(db, pairId, role) {
     const partnerSharedValue = isSova ? (currentData?.rysShardValue || '') : (currentData?.sovaShardValue || '');
     const myFragment = isSova ? (currentData?.sovaFragment || '') : (currentData?.rysFragment || '');
 
-    const myCombinedCode = isSova 
+    const myCombinedCode = isSova
       ? combineFragments(myFragment, partnerSharedValue)
       : combineFragments(partnerSharedValue, myFragment);
 
     const isCorrect = (currentFullCode && enteredCode === currentFullCode) || (myCombinedCode && enteredCode === myCombinedCode);
 
     if (isCorrect) {
-        // Správný kód!
-        const myStatusRef = ref(db, `rooms/${pairId}/actions/level4_truth/escapedPlayers/${isSova ? 'player1' : 'player2'}`);
-        const myShardStatus = isSova ? (currentData?.sovaShardStatus || '') : (currentData?.rysShardStatus || '');
-        const escapeState = (myShardStatus === 'fake') ? 'trapped' : 'escaped';
-        
-        set(myStatusRef, escapeState).then(() => {
-          console.log(`Zapsán stav: ${escapeState}`);
-        });
+      // Správný kód!
+      const myStatusRef = ref(db, `rooms/${pairId}/actions/level4_truth/escapedPlayers/${isSova ? 'player1' : 'player2'}`);
+      const myShardStatus = isSova ? (currentData?.sovaShardStatus || '') : (currentData?.rysShardStatus || '');
+      const escapeState = (myShardStatus === 'fake') ? 'trapped' : 'escaped';
+
+      set(myStatusRef, escapeState).then(() => {
+        console.log(`Zapsán stav: ${escapeState}`);
+      });
     } else {
-        console.log("Špatný kód!");
-        enteredCode = "";
-        updateCodeDisplay(enteredCode, codeDisplay);
-        update(dataRef, { attempts: currentAttempts + 1 });
-        
-        const container = document.getElementById('level4-container');
-        if (container) {
-          container.classList.add('shake');
-          setTimeout(() => container.classList.remove('shake'), 500);
-        }
-        
-        root.classList.add('flash-red');
-        setTimeout(() => root.classList.remove('flash-red'), 500);
+      console.log("Špatný kód!");
+      enteredCode = "";
+      updateCodeDisplay(enteredCode, codeDisplay);
+      update(dataRef, { attempts: currentAttempts + 1 });
+
+      const container = document.getElementById('level4-container');
+      if (container) {
+        container.classList.add('shake');
+        setTimeout(() => container.classList.remove('shake'), 500);
+      }
+
+      root.classList.add('flash-red');
+      setTimeout(() => root.classList.remove('flash-red'), 500);
     }
   };
 
@@ -238,7 +238,7 @@ export function initLevel4(db, pairId, role) {
 
     if (myStatus && myStatus !== 'waiting') {
       showOutcomeScreen(myStatus);
-      
+
       // Sova controls transition
       if (isSova && partnerStatus && partnerStatus !== 'waiting') {
         if (!transitionTimerStarted) {
@@ -263,7 +263,7 @@ export function initLevel4(db, pairId, role) {
     lastKnownAttempts = currentAttempts;
 
     myFragEl.textContent = isSova ? data.sovaFragment : data.rysFragment;
-    
+
     // Update my sharing UI (truth/lie buttons)
     const myShared = isSova ? data.sovaShared : data.rysShared;
     const shareContainer = document.getElementById('my-share-container');
@@ -291,7 +291,7 @@ export function initLevel4(db, pairId, role) {
             </div>
           `;
           shareContainer.dataset.rendered = 'buttons';
-          
+
           document.getElementById('btn-share-truth').onclick = () => {
             const trueFragment = isSova ? data.sovaFragment : data.rysFragment;
             update(dataRef, isSova ? {
@@ -304,7 +304,7 @@ export function initLevel4(db, pairId, role) {
               rysShardStatus: 'true'
             });
           };
-          
+
           document.getElementById('btn-share-lie').onclick = () => {
             update(dataRef, isSova ? {
               sovaShared: true,
@@ -325,17 +325,17 @@ export function initLevel4(db, pairId, role) {
 
     attemptsEl.textContent = `Pokusy: ${currentAttempts}/3`;
     if (currentAttempts >= 3 && isSova) {
-        get(ref(db, `rooms/${pairId}/actions/level4_truth/escapedPlayers`)).then(snap => {
-          const currentEscaped = snap.val() || { player1: 'waiting', player2: 'waiting' };
-          if (currentEscaped.player1 === 'waiting' && currentEscaped.player2 === 'waiting') {
-            console.log("Dosaženo limitu pokusů, regeneruji kód...");
-            const newData = generateLevel4Data();
-            newData.escapedPlayers = currentEscaped;
-            set(dataRef, newData);
-          } else {
-            console.log("Jeden z hráčů již dokončil hru. Reset kódu je zablokován.");
-          }
-        });
+      get(ref(db, `rooms/${pairId}/actions/level4_truth/escapedPlayers`)).then(snap => {
+        const currentEscaped = snap.val() || { player1: 'waiting', player2: 'waiting' };
+        if (currentEscaped.player1 === 'waiting' && currentEscaped.player2 === 'waiting') {
+          console.log("Dosaženo limitu pokusů, regeneruji kód...");
+          const newData = generateLevel4Data();
+          newData.escapedPlayers = currentEscaped;
+          set(dataRef, newData);
+        } else {
+          console.log("Jeden z hráčů již dokončil hru. Reset kódu je zablokován.");
+        }
+      });
     }
   });
 }
@@ -436,7 +436,7 @@ function showCodeResetModal() {
       <div style="font-size: 4rem; margin-bottom: 1rem;">🔄</div>
       <h2 style="color: var(--accent); margin: 0 0 1rem 0; font-size: 1.6rem;">Kód se změnil!</h2>
       <p style="font-size: 1.15rem; line-height: 1.6; margin: 0 0 2rem 0; color: var(--text);">
-        Zadali jste 3krát špatný kód. Zámek brány se resetoval, vygeneroval se **nový kód** a vaše fragmenty byly změněny.<br>
+        Zadali jste 3krát špatný kód. Zámek brány se resetoval, vygeneroval se nový kód a vaše fragmenty byly změněny.<br>
         <strong>Pošlete si nové úlomky a složte kód znovu!</strong>
       </p>
       <button id="btn-dismiss-code-reset" class="btn-crystal" style="padding: 1rem 2.5rem; font-size: 1.2rem; cursor: pointer; width: 100%;">

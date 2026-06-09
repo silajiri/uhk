@@ -59,24 +59,52 @@ export function initGameRouter(db, pairId, role, animal, avatar) {
           }
         });
 
-        root.innerHTML = `
-          <div class="level-transition-card">
-            <div class="success-icon">🌟</div>
-            <h1>Cíl dosažen!</h1>
-            <p>Společně jste ruku v ruce bezpečně prošli temným lesem. Sova vedla s rozvahou a Rys projevil hlubokou důvěru.</p>
-            <div class="status-message" style="margin-bottom: 1.5rem;">Připravte se, Mlžný les začíná chladnout...</div>
-            <button id="btn-transition-continue" class="btn-crystal" style="width: 100%; padding: 1.1rem; font-size: 1.15rem; font-weight: 700; cursor: pointer; border-radius: 18px;">
-              Pokračovat do další úrovně ➔
-            </button>
-          </div>
-        `;
+        // Načteme přezdívky zvířat z DB
+        const playersRef = ref(db, `rooms/${pairId}/players`);
+        get(playersRef).then((playersSnap) => {
+          const players = playersSnap.val() || {};
+          const p1Animal = players.animal1?.animal || 'Sova';
+          const p2Animal = players.animal2?.animal || 'Rys';
 
-        const btn = document.getElementById('btn-transition-continue');
-        if (btn) {
-          btn.onclick = () => {
-            initLevel2(db, pairId, role, animal, avatar);
-          };
-        }
+          root.innerHTML = `
+            <div class="level-transition-card">
+              <div class="success-icon">🌟</div>
+              <h1>Cíl dosažen!</h1>
+              <p>Společně jste ruku v ruce bezpečně prošli temným lesem. <strong>${p1Animal}</strong> vedl(a) s rozvahou a <strong>${p2Animal}</strong> projevil(a) hlubokou důvěru.</p>
+              <div class="status-message" style="margin-bottom: 1.5rem;">Připravte se, Mlžný les začíná chladnout...</div>
+              <button id="btn-transition-continue" class="btn-crystal" style="width: 100%; padding: 1.1rem; font-size: 1.15rem; font-weight: 700; cursor: pointer; border-radius: 18px;">
+                Pokračovat do další úrovně ➔
+              </button>
+            </div>
+          `;
+
+          const btn = document.getElementById('btn-transition-continue');
+          if (btn) {
+            btn.onclick = () => {
+              initLevel2(db, pairId, role, animal, avatar);
+            };
+          }
+        }).catch((err) => {
+          console.error("Chyba při načítání přezdívek pro přechod:", err);
+          root.innerHTML = `
+            <div class="level-transition-card">
+              <div class="success-icon">🌟</div>
+              <h1>Cíl dosažen!</h1>
+              <p>Společně jste ruku v ruce bezpečně prošli temným lesem. Sova vedla s rozvahou a Rys projevil hlubokou důvěru.</p>
+              <div class="status-message" style="margin-bottom: 1.5rem;">Připravte se, Mlžný les začíná chladnout...</div>
+              <button id="btn-transition-continue" class="btn-crystal" style="width: 100%; padding: 1.1rem; font-size: 1.15rem; font-weight: 700; cursor: pointer; border-radius: 18px;">
+                Pokračovat do další úrovně ➔
+              </button>
+            </div>
+          `;
+
+          const btn = document.getElementById('btn-transition-continue');
+          if (btn) {
+            btn.onclick = () => {
+              initLevel2(db, pairId, role, animal, avatar);
+            };
+          }
+        });
         break;
       }
       case 'level3':
