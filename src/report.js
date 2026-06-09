@@ -829,8 +829,13 @@ export async function initializeReport() {
   document.getElementById('btn-close-dialog').onclick = () => dialog.close();
   document.getElementById('btn-close-dialog-foot').onclick = () => dialog.close();
 
-  // Load profiles first, then register the Realtime Database listener
-  await loadProfiles();
+  // Load profiles asynchronously, and refresh the table when resolved
+  loadProfiles().then(() => {
+    console.log("Profily načteny, překresluji tabulku...");
+    renderTable();
+  }).catch((err) => {
+    console.error("Chyba při načítání profilů:", err);
+  });
 
   const roomsRef = ref(db, 'rooms');
   onValue(roomsRef, (snapshot) => {
