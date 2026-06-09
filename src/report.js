@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
-import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
 import { getDatabase, ref, onValue, remove, get } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
 
 // Firebase Configuration (matching admin.js)
@@ -836,6 +836,32 @@ async function handleLogout() {
   }
 }
 
+// Wait for Firebase Auth state to resolve (with timeout)
+function waitForAuth(timeoutMs = 10000) {
+  return new Promise((resolve) => {
+    // If auth already resolved, return immediately
+    if (auth.currentUser) return resolve(auth.currentUser);
+    
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        console.warn('Firebase Auth timeout po', timeoutMs, 'ms – pokračuji bez přihlášení.');
+        resolve(null);
+      }
+    }, timeoutMs);
+    
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        unsubscribe();
+        resolve(user);
+      }
+    });
+  });
+}
+
 // Export initialization function
 export async function initializeReport() {
   if (!checkAdminAccess()) return;
@@ -857,7 +883,22 @@ export async function initializeReport() {
   document.getElementById('btn-close-dialog').onclick = () => dialog.close();
   document.getElementById('btn-close-dialog-foot').onclick = () => dialog.close();
 
-  // Load profiles asynchronously, and refresh the table when resolved
+  // CRITICAL: Wait for Firebase Auth to resolve BEFORE registering database listener.
+  // Firebase RTDB delays onValue callbacks until auth state is known when security
+  // rules depend on auth. Without this wait, the spinner hangs indefinitely.
+  console.log('Čekám na stav Firebase Auth...');
+  const currentUser = await waitForAuth();
+  console.log('Firebase Auth stav:', currentUser ? currentUser.email : 'nepřihlášen');
+
+  if (!currentUser) {
+    // No authenticated user – show clear error, don't register listener
+    isDatabaseLoaded = true;
+    databaseError = { message: 'Nejste přihlášeni přes Google účet. Pro přístup k výsledkům se prosím nejprve přihlaste na hlavní stránce.' };
+    renderTable();
+    return;
+  }
+
+  // Load profiles asynchronously (non-blocking), and refresh the table when resolved
   loadProfiles().then(() => {
     console.log("Profily načteny, překresluji tabulku...");
     renderTable();
@@ -865,6 +906,7 @@ export async function initializeReport() {
     console.error("Chyba při načítání profilů:", err);
   });
 
+  // Now register the database listener – auth is resolved, so onValue will fire immediately
   const roomsRef = ref(db, 'rooms');
   onValue(roomsRef, (snapshot) => {
     isDatabaseLoaded = true;
