@@ -369,6 +369,9 @@ function renderTable() {
     const p1 = room.players?.animal1 || {};
     const p2 = room.players?.animal2 || {};
 
+    const sAnimal = p1.animal || 'Sova';
+    const rAnimal = p2.animal || 'Rys';
+
     const p1Email = p1.email || 'Nenastaven';
     const p2Email = p2.email || 'Nenastaven';
 
