@@ -66,7 +66,7 @@ const testCases = [
     expected: {
       type: "inprogress",
       desc: "⏳ Částečné sdílení",
-      details: "Sova již sdílela, Rys vyčkává.",
+      details: "Hráč 1 již sdílel, Hráč 2 vyčkává.",
       sChoice: "truth",
       rChoice: "none",
       sOutcome: "waiting",
@@ -115,8 +115,8 @@ const testCases = [
     },
     expected: {
       type: "betrayal-one",
-      desc: "⚠️ Sova oklamala Rysa",
-      details: "Sova odeslala lež, Rys pravdu. Reakce: 🔓 Rys odhalil lež a získal správný kód.",
+      desc: "⚠️ Hráč 1 oklamal partnera (Hráč 2)",
+      details: "Hráč 1 odeslal lež, Hráč 2 pravdu. Reakce: 🔓 Hráč 2 odhalil lež a získal správný kód.",
       sChoice: "lie",
       rChoice: "truth",
       sOutcome: "escaped",
@@ -140,8 +140,8 @@ const testCases = [
     },
     expected: {
       type: "betrayal-one",
-      desc: "⚠️ Rys oklamal Sovu",
-      details: "Rys odeslal lež, Sova pravdu. Reakce: ⏳ Sova dosud nezískala správný kód.",
+      desc: "⚠️ Hráč 2 oklamal partnera (Hráč 1)",
+      details: "Hráč 2 odeslal lež, Hráč 1 pravdu. Reakce: ⏳ Hráč 1 dosud nezískal správný kód.",
       sChoice: "truth",
       rChoice: "lie",
       sOutcome: "waiting",
@@ -166,7 +166,7 @@ const testCases = [
     expected: {
       type: "betrayal-mutual",
       desc: "🚨 Vzájemná zrada",
-      details: "Oba se oklamali. Reakce: Sova získala správný kód, Rys získal správný kód.",
+      details: "Oba se oklamali. Reakce: Hráč 1 získal správný kód, Hráč 2 získal správný kód.",
       sChoice: "lie",
       rChoice: "lie",
       sOutcome: "trapped",

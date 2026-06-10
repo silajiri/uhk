@@ -90,34 +90,16 @@ export function analyzeRoomBehavior(room) {
   const sReveal = room.revealDecisions?.player1 || '';
   const rReveal = room.revealDecisions?.player2 || '';
 
-  const sAnimal = room.players?.animal1?.animal || 'Sova';
-  const rAnimal = room.players?.animal2?.animal || 'Rys';
+  const sAnimal = 'Hráč 1';
+  const rAnimal = 'Hráč 2';
 
   // Verb helpers for proper Czech inflection
   const getVerb = (animal, verbBase) => {
-    if (animal === 'Sova') {
-      if (verbBase === 'odeslal') return 'odeslala';
-      if (verbBase === 'oklamal') return 'oklamala';
-      if (verbBase === 'získal') return 'získala';
-      if (verbBase === 'sdílel') return 'sdílela';
-      if (verbBase === 'odhalil') return 'odhalila';
-      if (verbBase === 'nezískal') return 'nezískala';
-    }
-    if (animal === 'Rys') {
-      if (verbBase === 'odeslal') return 'odeslal';
-      if (verbBase === 'oklamal') return 'oklamal';
-      if (verbBase === 'získal') return 'získal';
-      if (verbBase === 'sdílel') return 'sdílel';
-      if (verbBase === 'odhalil') return 'odhalil';
-      if (verbBase === 'nezískal') return 'nezískal';
-    }
-    return `${verbBase}(a)`;
+    return verbBase;
   };
 
   const getOklamalDesc = (sub, obj) => {
-    if (sub === 'Sova' && obj === 'Rys') return '⚠️ Sova oklamala Rysa';
-    if (sub === 'Rys' && obj === 'Sova') return '⚠️ Rys oklamal Sovu';
-    return `⚠️ ${sub} oklamal(a) partnera (${obj})`;
+    return `⚠️ ${sub} oklamal partnera (${obj})`;
   };
 
   let type = 'inprogress'; // 'cooperate' | 'betrayal-one' | 'betrayal-mutual' | 'inprogress'
@@ -314,12 +296,12 @@ function renderL4StatusColumn(sAnimal, sName, sChoice, sOutcome, sReveal, rAnima
 
   return `
     <div style="margin-bottom: 0.4rem;">
-      <strong>${sAnimal} (${sName}):</strong><br>
+      <strong>Hráč 1 (${sName}):</strong><br>
       ${getChoiceBadge(sChoice)} &nbsp; ${getOutcomeBadge(sOutcome)}<br>
       <small>${getRevealLabel(sReveal)}</small>
     </div>
     <div>
-      <strong>${rAnimal} (${rName}):</strong><br>
+      <strong>Hráč 2 (${rName}):</strong><br>
       ${getChoiceBadge(rChoice)} &nbsp; ${getOutcomeBadge(rOutcome)}<br>
       <small>${getRevealLabel(rReveal)}</small>
     </div>
@@ -442,8 +424,8 @@ function renderTable() {
             L2: <span style="font-weight:600; color:${l2Resets > 0 ? 'var(--warning)' : 'var(--success)'}">${l2Resets}x</span><br>
             <div style="font-size: 0.75rem; margin-top: 0.3rem; border-top: 1px solid rgba(0,0,0,0.08); padding-top: 0.3rem; color: var(--muted); line-height: 1.3;">
               <strong>Most L3:</strong><br>
-              Sova: ${room.actions?.level3_bridge?.stats?.player1?.success ? '🟢' : (room.actions?.level3_bridge?.stats?.player1?.attemptsUsed !== undefined ? '🔴' : '⏳')} (${room.actions?.level3_bridge?.stats?.player1?.attemptsUsed || 0}p, 👏${room.actions?.level3_bridge?.stats?.player1?.supportSent || 0}/😜${room.actions?.level3_bridge?.stats?.player1?.hateSent || 0})<br>
-              Rys: ${room.actions?.level3_bridge?.stats?.player2?.success ? '🟢' : (room.actions?.level3_bridge?.stats?.player2?.attemptsUsed !== undefined ? '🔴' : '⏳')} (${room.actions?.level3_bridge?.stats?.player2?.attemptsUsed || 0}p, 👏${room.actions?.level3_bridge?.stats?.player2?.supportSent || 0}/😜${room.actions?.level3_bridge?.stats?.player2?.hateSent || 0})
+              Hráč 1: ${room.actions?.level3_bridge?.stats?.player1?.success ? '🟢' : (room.actions?.level3_bridge?.stats?.player1?.attemptsUsed !== undefined ? '🔴' : '⏳')} (${room.actions?.level3_bridge?.stats?.player1?.attemptsUsed || 0}p, 👏${room.actions?.level3_bridge?.stats?.player1?.supportSent || 0}/😜${room.actions?.level3_bridge?.stats?.player1?.hateSent || 0})<br>
+              Hráč 2: ${room.actions?.level3_bridge?.stats?.player2?.success ? '🟢' : (room.actions?.level3_bridge?.stats?.player2?.attemptsUsed !== undefined ? '🔴' : '⏳')} (${room.actions?.level3_bridge?.stats?.player2?.attemptsUsed || 0}p, 👏${room.actions?.level3_bridge?.stats?.player2?.supportSent || 0}/😜${room.actions?.level3_bridge?.stats?.player2?.hateSent || 0})
             </div>
           </td>
           <td>
@@ -522,8 +504,8 @@ async function openChatInspector(roomId) {
   const p1Email = room.players?.animal1?.email;
   const p2Email = room.players?.animal2?.email;
 
-  const p1Name = getStudentName(p1Email, 'Sova');
-  const p2Name = getStudentName(p2Email, 'Rys');
+  const p1Name = getStudentName(p1Email, 'Hráč 1');
+  const p2Name = getStudentName(p2Email, 'Hráč 2');
 
   title.textContent = `💬 Chat v reflexi – Místnost ${roomId}`;
   history.innerHTML = '<div style="text-align:center; padding:2rem;"><div class="spinner"></div><br>Načítám zprávy...</div>';
@@ -542,8 +524,8 @@ async function openChatInspector(roomId) {
     const sortedMsgs = Object.values(chatData).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
     let html = '';
-    const sAnimal = room.players?.animal1?.animal || 'Sova';
-    const rAnimal = room.players?.animal2?.animal || 'Rys';
+    const sAnimal = 'Hráč 1';
+    const rAnimal = 'Hráč 2';
 
     sortedMsgs.forEach(msg => {
       const isSova = msg.sender === 'player1';
@@ -584,6 +566,22 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
+// Strip emojis and other problematic Excel characters
+function stripEmojis(val) {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  return str
+    .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
+    .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
+    .replace(/[\u{2600}-\u{26FF}]/gu, '')
+    .replace(/[\u{2700}-\u{27BF}]/gu, '')
+    .replace(/[\u{E000}-\u{F8FF}]/gu, '')
+    .replace(/[🟢🔴🤝🚨⚠️🔓⏳🦉🐾❄️🔥🌉🔒🗝️💬✨]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Export summary reports to CSV (Excel compatible, Semicolon delimiter, UTF-8 with BOM)
 function exportStatsToCSV() {
   if (!roomsData || Object.keys(roomsData).length === 0) {
@@ -596,34 +594,35 @@ function exportStatsToCSV() {
     // 1. Identifikace místnosti a žáků
     'Místnost ID',
     'Stav hry',
-    'Hráč 1 (Sova) - Jméno',
-    'Hráč 1 (Sova) - Email',
-    'Hráč 2 (Rys) - Jméno',
-    'Hráč 2 (Rys) - Email',
+    'Hráč 1 - Jméno',
+    'Hráč 1 - Email',
+    'Hráč 2 - Jméno',
+    'Hráč 2 - Email',
     // 2. Level 1 & Level 2 chybovost
     'L1 Bludiště - Pády',
     'L2 Vánice - Resety',
     // 3. Level 3 (Skleněný most)
-    'Hráč 1 (Sova) - L3 Most Úspěch',
-    'Hráč 1 (Sova) - L3 Most Pokusy',
-    'Hráč 1 (Sova) - L3 Most Podpory',
-    'Hráč 1 (Sova) - L3 Most Výsměchy',
-    'Hráč 1 (Sova) - L3 Most Reakce',
-    'Hráč 2 (Rys) - L3 Most Úspěch',
-    'Hráč 2 (Rys) - L3 Most Pokusy',
-    'Hráč 2 (Rys) - L3 Most Podpory',
-    'Hráč 2 (Rys) - L3 Most Výsměchy',
-    'Hráč 2 (Rys) - L3 Most Reakce',
+    'Hráč 1 - L3 Most Úspěch',
+    'Hráč 1 - L3 Most Pokusy',
+    'Hráč 1 - L3 Most Podpory',
+    'Hráč 1 - L3 Most Výsměchy',
+    'Hráč 1 - L3 Most Reakce',
+    'Hráč 2 - L3 Most Úspěch',
+    'Hráč 2 - L3 Most Pokusy',
+    'Hráč 2 - L3 Most Podpory',
+    'Hráč 2 - L3 Most Výsměchy',
+    'Hráč 2 - L3 Most Reakce',
     // 4. Level 4 (Brána pravdy)
-    'Hráč 1 (Sova) - L4 Brána Volba',
-    'Hráč 1 (Sova) - L4 Brána Výsledek',
-    'Hráč 2 (Rys) - L4 Brána Volba',
-    'Hráč 2 (Rys) - L4 Brána Výsledek',
+    'Hráč 1 - L4 Brána Volba',
+    'Hráč 1 - L4 Brána Výsledek',
+    'Hráč 2 - L4 Brána Volba',
+    'Hráč 2 - L4 Brána Výsledek',
+    'L4 Brána - Pokusy',
     'L4 Kooperační scénář',
     'L4 Popis chování',
     // 5. Reflexe
-    'Hráč 1 (Sova) - Odhalení',
-    'Hráč 2 (Rys) - Odhalení',
+    'Hráč 1 - Odhalení',
+    'Hráč 2 - Odhalení',
     'Celkem zpráv v reflexi'
   ];
 
@@ -639,8 +638,8 @@ function exportStatsToCSV() {
     const p1Email = p1.email || 'Nenastaven';
     const p2Email = p2.email || 'Nenastaven';
 
-    const p1Name = getStudentName(p1Email, 'Sova');
-    const p2Name = getStudentName(p2Email, 'Rys');
+    const p1Name = getStudentName(p1Email, 'Hráč 1');
+    const p2Name = getStudentName(p2Email, 'Hráč 2');
 
     const state = room.state || 'level1';
     const l1Resets = room.actions?.level1_darkness?.resetCount || 0;
@@ -696,6 +695,9 @@ function exportStatsToCSV() {
     if (behavior.type === 'betrayal-one') scenario = 'Jednostranná zrada';
     if (behavior.type === 'betrayal-mutual') scenario = 'Vzájemná zrada';
 
+    const l4 = room.actions?.level4_truth || {};
+    const l4Attempts = l4.attempts || 0;
+
     rows.push([
       // 1. Identifikace
       roomId,
@@ -723,6 +725,7 @@ function exportStatsToCSV() {
       outcomeSova,
       choiceRys,
       outcomeRys,
+      l4Attempts,
       scenario,
       behavior.desc + ' - ' + behavior.details,
       // 5. Reflexe
@@ -734,8 +737,9 @@ function exportStatsToCSV() {
 
   // Convert to CSV String (use Semicolon for European Excel)
   const csvContent = rows.map(r => r.map(val => {
-    // Escape double quotes and wrap strings containing delimiters
-    const strVal = String(val).replace(/"/g, '""');
+    // Escape double quotes and wrap strings containing delimiters after stripping emojis
+    const cleanVal = stripEmojis(val);
+    const strVal = String(cleanVal).replace(/"/g, '""');
     return `"${strVal}"`;
   }).join(';')).join('\n');
 
@@ -754,8 +758,8 @@ async function exportChatsToCSV() {
 
   const headers = [
     'Místnost ID',
-    'Sova (Jméno)',
-    'Rys (Jméno)',
+    'Hráč 1 (Jméno)',
+    'Hráč 2 (Jméno)',
     'Odesílatel (Role)',
     'Odesílatel (Jméno)',
     'Text zprávy',
@@ -771,13 +775,13 @@ async function exportChatsToCSV() {
     const p1Email = room.players?.animal1?.email;
     const p2Email = room.players?.animal2?.email;
 
-    const p1Name = getStudentName(p1Email, 'Sova');
-    const p2Name = getStudentName(p2Email, 'Rys');
+    const p1Name = getStudentName(p1Email, 'Hráč 1');
+    const p2Name = getStudentName(p2Email, 'Hráč 2');
 
     const sortedMsgs = Object.values(chatData).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
-    const sAnimal = room.players?.animal1?.animal || 'Sova';
-    const rAnimal = room.players?.animal2?.animal || 'Rys';
+    const sAnimal = 'Hráč 1';
+    const rAnimal = 'Hráč 2';
 
     sortedMsgs.forEach(msg => {
       const isSova = msg.sender === 'player1';
@@ -808,7 +812,8 @@ async function exportChatsToCSV() {
   }
 
   const csvContent = rows.map(r => r.map(val => {
-    const strVal = String(val).replace(/"/g, '""');
+    const cleanVal = stripEmojis(val);
+    const strVal = String(cleanVal).replace(/"/g, '""');
     return `"${strVal}"`;
   }).join(';')).join('\n');
 
