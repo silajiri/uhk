@@ -207,15 +207,50 @@ async function handleLogout() {
   }
 }
 
-function checkAdminAccess() {
-  const userData = JSON.parse(localStorage.getItem('uhkUser') || '{}');
-  
-  if (userData.role !== 'admin') {
+const LOOKUP_URL = 'https://europe-west1-uhk-game.cloudfunctions.net/lookupMappingByEmail';
+
+/**
+ * Ověří admin roli přes server (Firebase ID token) – nikoliv jen z localStorage.
+ * Vrátí true pokud je uživatel admin, jinak přesměruje na index.html.
+ */
+async function checkAdminAccess() {
+  // Počkáme na inicializaci Firebase Auth
+  const user = await new Promise((resolve) => {
+    const unsubscribe = auth.onAuthStateChanged((u) => {
+      unsubscribe();
+      resolve(u);
+    });
+  });
+
+  if (!user) {
     window.location.href = 'index.html';
     return false;
   }
-  
-  return true;
+
+  try {
+    const idToken = await user.getIdToken();
+    const response = await fetch(LOOKUP_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.status !== 'success' || data.role !== 'admin') {
+      window.location.href = 'index.html';
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Admin access check failed:', err);
+    window.location.href = 'index.html';
+    return false;
+  }
 }
 
 ﻿async function saveProfiles() {
@@ -657,8 +692,9 @@ function setupAvatarGalleryToggle() {
   });
 }
 
-export function initializeAdmin() {
-  if (!checkAdminAccess()) return;
+export async function initializeAdmin() {
+  const isAdmin = await checkAdminAccess();
+  if (!isAdmin) return;
 
   // Registrace posluchačů okamžitě
   document.getElementById('logoutBtn').addEventListener('click', handleLogout);
