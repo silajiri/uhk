@@ -1,8 +1,10 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+const functions = require('firebase-functions/v1');
+const { initializeApp } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
+const { getDatabase } = require('firebase-admin/database');
 
-admin.initializeApp();
-const db = admin.database();
+initializeApp();
+const db = getDatabase();
 
 // Allowed origins (only GitHub Pages and localhost for development)
 const ALLOWED_ORIGINS = [
@@ -69,7 +71,7 @@ exports.lookupMappingByEmail = functions.region('europe-west1').https.onRequest(
   }
 
   try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const decodedToken = await getAuth().verifyIdToken(idToken);
     const email = decodedToken.email;
     if (!email) {
       return res.status(401).json({ status: 'error', message: 'Nelze získat e-mail z tokenu' });
@@ -146,7 +148,7 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
     }
 
     try {
-      const decodedToken = await admin.auth().verifyIdToken(idToken);
+      const decodedToken = await getAuth().verifyIdToken(idToken);
       const email = decodedToken.email;
       if (!email) {
         return res.status(401).json({ status: 'error', message: 'Nelze získat e-mail z tokenu' });
@@ -246,7 +248,7 @@ exports.saveGameData = functions.region('europe-west1').https.onRequest(async (r
   }
 
   try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const decodedToken = await getAuth().verifyIdToken(idToken);
     const email = decodedToken.email;
     if (!email) {
       return res.status(401).json({ status: 'error', message: 'Nelze získat e-mail z tokenu' });
